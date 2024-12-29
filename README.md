@@ -21,9 +21,24 @@ Raspberry-Pi Pico based USB DAC with 2ch parametric equalizer
 
 Then this board will be recognized as "Pico Sound Card with EQ"
 
+## Operation
+
+* Top-Left button toggles EQ (EQ ON or THROUGH)
+* Bottom-Left button (SEL) switches 8 modes
+  - EQ1 GAIN
+  - EQ1 FREQ
+  - EQ1 WIDTH
+  - EQ2 GAIN
+  - EQ2 FREQ
+  - EQ2 WIDTH
+  - TOTAL GAIN
+  - SETTINGS (to save settings to flash or restore factory settings)
+* Top-right and Bottom-Right buttons increases / decreases values (in first 7 modes)
+
 ## Limitations and tips
 
 * When the settings are saved to flash memory, the sound card stops (the board reboots)
+* High gain (peak of EQ or total gain) sometimes causes noise (overflow of 16bit values)
 * If you use VCC-GND YD-RP2040 board (compatibles of Raspberry-Pi Pico), bridge pin 39 and 40 (Vin and Vout) because Waveshare boards are powered from Pin39 (but pin 39 of YD-RP2040 can not supply power)
 
 ## Base softwares
