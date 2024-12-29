@@ -40,6 +40,7 @@ Then this board will be recognized as "Pico Sound Card with EQ"
 * When the settings are saved to flash memory, the sound card stops (the board reboots)
 * High gain (peak of EQ or total gain) sometimes causes noise (overflow of 16bit values)
 * If you use VCC-GND YD-RP2040 board (compatibles of Raspberry-Pi Pico), bridge pin 39 and 40 (Vin and Vout) because Waveshare boards are powered from Pin39 (but pin 39 of YD-RP2040 can not supply power)
+![boardss](https://github.com/user-attachments/assets/48f579f6-3e2b-4a8b-b544-320f3714dd84)
 
 ## Base softwares
 
