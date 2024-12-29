@@ -46,7 +46,7 @@ Settings setting = {
   0
 };
 
-#define SHIFT_C 22 // fixed point for coeffs
+#define SHIFT_C 20 // fixed point for coeffs
 #define SHIFT_V 16 // fixed point for value
 
 BiQuadCoeffs coeff[EQ_CH];
@@ -54,7 +54,7 @@ typedef struct {
   int64_t a1, a2, b0, b1, b2; // filter fixed point coeffs
 } BinCoeffs;
 BinCoeffs bc[EQ_CH];
-int64_t gainBC = (1 << 16);
+int64_t gainBC = (1 << SHIFT_V);
 
 volatile bool sw = true; // switch of filter on/off
 
@@ -64,16 +64,16 @@ static void calcBinCoeffs(void) {
 
   for(int i = 0; i < EQ_CH; i++) {
     coeff[i] = calcCoeffs(FREQ_SAMPLE, setting.freqCenter[i] , setting.bandWidth[i], setting.gain[i]);
-    bc[i].a1 = coeff[i].a1 * (1 << SHIFT_C);
-    bc[i].a2 = coeff[i].a2 * (1 << SHIFT_C);
-    bc[i].b0 = coeff[i].b0 * (1 << SHIFT_C);
-    bc[i].b1 = coeff[i].b1 * (1 << SHIFT_C);
-    bc[i].b2 = coeff[i].b2 * (1 << SHIFT_C);
+    bc[i].a1 = coeff[i].a1 * (1 << SHIFT_C) + 0.5;
+    bc[i].a2 = coeff[i].a2 * (1 << SHIFT_C) + 0.5;
+    bc[i].b0 = coeff[i].b0 * (1 << SHIFT_C) + 0.5;
+    bc[i].b1 = coeff[i].b1 * (1 << SHIFT_C) + 0.5;
+    bc[i].b2 = coeff[i].b2 * (1 << SHIFT_C) + 0.5;
   }
-  gainBC = (int64_t) ((double)(1 << 16) / pow(10, setting.totalGain/20));
+  gainBC = (int64_t) ((double)(1 << SHIFT_V) / pow(10, setting.totalGain/20));
 }
 
-static int32_t filterL(int32_t in) {
+static int32_t filterL(int64_t in) {
   static int64_t in1[EQ_CH], in2[EQ_CH], out[EQ_CH], out1[EQ_CH], out2[EQ_CH];
     
   if(!sw) {
@@ -90,7 +90,7 @@ static int32_t filterL(int32_t in) {
   return in / gainBC;
 }
 
-static int32_t filterR(int32_t in) {
+static int32_t filterR(int64_t in) {
   static int64_t in1[EQ_CH], in2[EQ_CH], out[EQ_CH], out1[EQ_CH], out2[EQ_CH];
     
   if(!sw) {
@@ -646,7 +646,7 @@ static struct {
 static struct audio_buffer_pool *producer_pool;
 
 static void _as_audio_packet(struct usb_endpoint *ep) {
-  static uint16_t vol2 = 0;
+  static int32_t vol2 = 0;
 
   assert(ep->current_transfer);
   struct usb_buffer *usb_buffer = usb_current_out_packet_buffer(ep);
@@ -669,13 +669,8 @@ static void _as_audio_packet(struct usb_endpoint *ep) {
   int16_t *out = (int16_t *) audio_buffer->buffer->bytes;
   int16_t *in = (int16_t *) usb_buffer->data;
   for (int i = 0; i < audio_buffer->sample_count * 2; i+=2) {
-#if 0
     out[i  ] = (filterR(in[i  ]) * vol2) >> 15u;
     out[i+1] = (filterL(in[i+1]) * vol2) >> 15u;
-#else
-    out[i  ] = filterR((in[i  ] * vol2) >> 15u);
-    out[i+1] = filterL((in[i+1] * vol2) >> 15u);
-#endif
   }
 
   give_audio_buffer(producer_pool, audio_buffer);
