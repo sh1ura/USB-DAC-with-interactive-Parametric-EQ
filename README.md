@@ -21,8 +21,18 @@ Raspberry-Pi Pico based USB DAC with 2ch parametric equalizer
 
 Then this board will be recognized as "Pico Sound Card with EQ"
 
+## Limitations and tips
+
+* When the settings are saved to flash memory, the sound card stops (the board reboots)
+* If you use VCC-GND YD-RP2040 board (compatibles of Raspberry-Pi Pico), bridge pin 39 and 40 (Vin and Vout) because Waveshare boards are powered from Pin39 (but pin 39 of YD-RP2040 can not supply power)
+
 ## Base softwares
 
 * [usb-sound-card sample](https://github.com/raspberrypi/pico-playground/tree/master/apps/usb_sound_card) in pico-playground of pico-SDK
 * [Sample code](https://files.waveshare.com/wiki/Pico-1.3-LCD/RP2040-LCD-LVGL.zip) of [Waveshare Pico LCD 2](https://www.waveshare.com/wiki/Pico-LCD-2) (but I do not use LVGL functions)
 * [bitmap-OSD-font](https://github.com/frisnit/bitmap-OSD-font/tree/master) (font.c)
+
+## Other resources
+
+* [Implementation of BiQuad digital filter in C](https://www.utsbox.com/?page_id=523)
+* 
