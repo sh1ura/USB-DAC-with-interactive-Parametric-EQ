@@ -646,6 +646,8 @@ static struct {
 static struct audio_buffer_pool *producer_pool;
 
 static void _as_audio_packet(struct usb_endpoint *ep) {
+  static uint16_t vol2 = 0;
+
   assert(ep->current_transfer);
   struct usb_buffer *usb_buffer = usb_current_out_packet_buffer(ep);
   DEBUG_PINS_SET(audio_timing, 1);
@@ -657,11 +659,23 @@ static void _as_audio_packet(struct usb_endpoint *ep) {
   assert(audio_buffer->sample_count);
   assert(audio_buffer->max_sample_count >= audio_buffer->sample_count);
   uint16_t vol_mul = audio_state.vol_mul;
+
+  //volume fade
+  if(vol2 < vol_mul - 4) vol2 += 4;
+  else if(vol2 < vol_mul) vol2++;
+  else if(vol2 > vol_mul + 4) vol2 -= 4;
+  else if(vol2 > vol_mul) vol2--;
+
   int16_t *out = (int16_t *) audio_buffer->buffer->bytes;
   int16_t *in = (int16_t *) usb_buffer->data;
   for (int i = 0; i < audio_buffer->sample_count * 2; i+=2) {
-    out[i  ] = (filterR(in[i  ]) * vol_mul) >> 15u;
-    out[i+1] = (filterL(in[i+1]) * vol_mul) >> 15u;
+#if 0
+    out[i  ] = (filterR(in[i  ]) * vol2) >> 15u;
+    out[i+1] = (filterL(in[i+1]) * vol2) >> 15u;
+#else
+    out[i  ] = filterR((in[i  ] * vol2) >> 15u);
+    out[i+1] = filterL((in[i+1] * vol2) >> 15u);
+#endif
   }
 
   give_audio_buffer(producer_pool, audio_buffer);
