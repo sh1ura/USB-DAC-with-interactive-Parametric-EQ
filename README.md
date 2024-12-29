@@ -35,7 +35,7 @@ Then this board will be recognized as "Pico Sound Card with EQ"
   - SETTINGS (to save settings to flash or restore factory settings)
 * Top-right and Bottom-Right buttons increases / decreases values (in first 7 modes)
 
-<iframe width="560" height="315" src="https://www.youtube.com/embed/vReo5DAdtEo?si=OHYJFlcT-ySRWw_W" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+https://www.youtube.com/watch?v=vReo5DAdtEo
 
 ## Limitations and tips
 
