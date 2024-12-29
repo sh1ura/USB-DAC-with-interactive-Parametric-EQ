@@ -33,15 +33,15 @@ Then this board will be recognized as "Pico Sound Card with EQ"
   - EQ2 FREQ
   - EQ2 WIDTH
   - TOTAL GAIN
-  - SETTINGS (to save settings to flash or restore factory settings)
-* Top-right and Bottom-Right buttons increases / decreases values (in first 7 modes)
+  - SETTINGS (save settings to flash or restore factory settings)
+* Top-Right and Bottom-Right buttons increase / decrease values (in first 7 modes)
 
-https://www.youtube.com/watch?v=vReo5DAdtEo
+Operation: https://www.youtube.com/watch?v=vReo5DAdtEo
 
 ## Limitations and tips
 
 * When the settings are saved to flash memory, the sound card stops (the board reboots)
-* High gain (peak of EQ or total gain) sometimes causes noise (overflow of 16bit values)
+* High gain (high peak of EQ or high total gain) sometimes causes noise (overflow of 16bit values)
 * If you use VCC-GND YD-RP2040 board (compatibles of Raspberry-Pi Pico), bridge pin 39 and 40 (Vin and Vout) because Waveshare boards are powered from Pin39 (but pin 39 of YD-RP2040 can not supply power)
 ![boardss](https://github.com/user-attachments/assets/48f579f6-3e2b-4a8b-b544-320f3714dd84)
 
@@ -54,4 +54,3 @@ https://www.youtube.com/watch?v=vReo5DAdtEo
 ## Other resources
 
 * [Implementation of BiQuad digital filter in C](https://www.utsbox.com/?page_id=523)
-* 
