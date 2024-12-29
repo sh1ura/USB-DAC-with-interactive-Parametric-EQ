@@ -13,7 +13,7 @@ Raspberry-Pi Pico based USB DAC with 2ch parametric equalizer
 * [Waveshare Pico LCD 2](https://www.waveshare.com/wiki/Pico-LCD-2) (2inch LCD Display Module)
 * [Waveshare Pico-Audio](https://www.waveshare.com/wiki/Pico-Audio) (I used Rev.1 board with Burr-Brown PCM5101A)
 
-## How to make
+## How to make (with precompiled binary)
 
 1. Stack three boards
 2. Connect USB to your PC while press and hold BOOTSEL button
