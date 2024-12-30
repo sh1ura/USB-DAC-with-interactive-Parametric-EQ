@@ -2,7 +2,8 @@
 
 Raspberry-Pi Pico based USB DAC with 2ch parametric equalizer
 
-![DSC_2690ts](https://github.com/user-attachments/assets/6cd02f6a-7b1e-4e5e-8dca-a2b30f005c9e)
+![DSC_2694_01ts](https://github.com/user-attachments/assets/085e5765-5baa-4c8d-9bde-daaae47f6dad)
+
 
 * No soldering needed (if you use genuine Raspberry Pi Pico with pinheaders)
 * Easy to operate with four buttons and large LCD display
