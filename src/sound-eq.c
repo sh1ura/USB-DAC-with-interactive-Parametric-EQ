@@ -82,7 +82,7 @@ static int32_t filterL(int64_t in) {
   in <<= SHIFT_V;
   for(int i = 0; i < EQ_CH; i++) {
     out[i] = bc[i].b0 * in + bc[i].b1 * in1[i] + bc[i].b2 * in2[i] - bc[i].a1 * out1[i] - bc[i].a2 * out2[i];
-    out[i] = (out[i] + (1 << (SHIFT_C - 1))) >> SHIFT_C;
+    out[i] = out[i] >> SHIFT_C;
     in2[i] = in1[i];    in1[i] = in;
     out2[i] = out1[i];  out1[i] = out[i];
     in = out[i];
@@ -99,7 +99,7 @@ static int32_t filterR(int64_t in) {
   in <<= SHIFT_V;
   for(int i = 0; i < EQ_CH; i++) {
     out[i] = bc[i].b0 * in + bc[i].b1 * in1[i] + bc[i].b2 * in2[i] - bc[i].a1 * out1[i] - bc[i].a2 * out2[i];
-    out[i] = (out[i] + (1 << (SHIFT_C - 1))) >> SHIFT_C;
+    out[i] = out[i] >> SHIFT_C;
     in2[i] = in1[i];    in1[i] = in;
     out2[i] = out1[i];  out1[i] = out[i];
     in = out[i];
@@ -645,6 +645,9 @@ static struct {
 
 static struct audio_buffer_pool *producer_pool;
 
+#define FADE_SPEED1 100
+#define FADE_SPEED2 40
+
 static void _as_audio_packet(struct usb_endpoint *ep) {
   static int32_t vol2 = 0;
 
@@ -660,12 +663,19 @@ static void _as_audio_packet(struct usb_endpoint *ep) {
   assert(audio_buffer->max_sample_count >= audio_buffer->sample_count);
   uint16_t vol_mul = audio_state.vol_mul;
 
+  if(audio_state.mute) {
+    vol_mul = 1;
+  }
   //volume fade
-  if(vol2 < vol_mul - 4) vol2 += 4;
-  else if(vol2 < vol_mul) vol2++;
-  else if(vol2 > vol_mul + 4) vol2 -= 4;
+  if(vol2 != vol_mul) {
+    int32_t diff = (vol_mul - vol2) / FADE_SPEED1;
+    if      (diff >  FADE_SPEED2) diff =  FADE_SPEED2;
+    else if (diff < -FADE_SPEED2) diff = -FADE_SPEED2;
+    vol2 += diff;
+  }
+  if     (vol2 < vol_mul) vol2++;
   else if(vol2 > vol_mul) vol2--;
-
+  
   int16_t *out = (int16_t *) audio_buffer->buffer->bytes;
   int16_t *in = (int16_t *) usb_buffer->data;
   for (int i = 0; i < audio_buffer->sample_count * 2; i+=2) {
