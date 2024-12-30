@@ -203,7 +203,7 @@ void myInit(void) {
 #define GRAPH_GAIN_MAX  20 // dB
 #define GRAPH_GAIN_MIN -20 // dB
 
-#define MARGIN_LEFT 50
+#define MARGIN_LEFT 40
 #define MARGIN_TOP 20
 #define MARGIN_BOTTOM 40
 
@@ -234,7 +234,7 @@ static void drawAxis(void) {
       image[y][x] = 0xFFFF;
     }
   }
-  for(int x = 50; x < LCD_WIDTH; x++) {
+  for(int x = MARGIN_LEFT; x < LCD_WIDTH; x++) {
     drawPoint(x, GAIN_TO_Y(-20), COL(25, 25, 25));
     drawPoint(x, GAIN_TO_Y(-15), COL(28, 28, 28));
     drawPoint(x, GAIN_TO_Y(-10), COL(25, 25, 25));
@@ -244,11 +244,12 @@ static void drawAxis(void) {
     drawPoint(x, GAIN_TO_Y( 10), COL(25, 25, 25));
     drawPoint(x, GAIN_TO_Y( 15), COL(28, 28, 28));
   }
-  drawText(10, GAIN_TO_Y(  0) - 7, "  0", BLACK);
-  drawText(10, GAIN_TO_Y( 10) - 7, " 10", BLACK);
-  drawText(10, GAIN_TO_Y(-10) - 7, "-10", BLACK);
+  drawText(2, GAIN_TO_Y(  0) - 7, "  0", BLACK);
+  drawText(2, GAIN_TO_Y( 10) - 7, " 10", BLACK);
+  drawText(2, GAIN_TO_Y(-10) - 7, "-10", BLACK);
+  drawText(2, GAIN_TO_Y(-20) - 7, "-20", BLACK);
   
-  for(int y = 20; y < LCD_HEIGHT-40; y++) {
+  for(int y = MARGIN_TOP; y < LCD_HEIGHT - MARGIN_BOTTOM; y++) {
     drawPoint(FREQ_TO_X(   20), y, COL(28, 28, 28));
     drawPoint(FREQ_TO_X(   40), y, COL(28, 28, 28));
     drawPoint(FREQ_TO_X(   60), y, COL(28, 28, 28));
@@ -272,17 +273,13 @@ static void drawAxis(void) {
 
   drawText(0, 1, "EQ ON/OFF", WHITE);
   drawText(0, LCD_HEIGHT - 15, "SEL", WHITE);
-  drawText(LCD_WIDTH-62, 1, mode == 7 ? " SAVE" : "   UP", WHITE);
-  drawText(LCD_WIDTH-62, LCD_HEIGHT - 15, mode == 7 ? "RESET" : " DOWN", WHITE);
+  drawText(LCD_WIDTH-61, 1, mode == 7 ? " SAVE" : "   UP", WHITE);
+  drawText(LCD_WIDTH-61, LCD_HEIGHT - 15, mode == 7 ? "RESET" : " DOWN", WHITE);
 
   drawText(LCD_WIDTH/2-60, LCD_HEIGHT - 15, modeStr[mode], GREEN);
   
-  if(sw) {
-    drawText(LCD_WIDTH/2, 1, "EQ ON", RED);
-  }
-  else {
-    drawText(LCD_WIDTH/2, 1, "THROUGH", BLUE);
-  }
+  if(sw) drawText(LCD_WIDTH/2-10, 1, " EQ ON", RED);
+  else   drawText(LCD_WIDTH/2-10, 1, "THROUGH", BLUE);
 }  
 
 static void drawResponse(BiQuadCoeffs c[]) {
