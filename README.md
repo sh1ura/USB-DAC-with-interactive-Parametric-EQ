@@ -49,6 +49,7 @@ Operation: https://www.youtube.com/watch?v=vReo5DAdtEo
 ## Base softwares
 
 * [usb-sound-card sample](https://github.com/raspberrypi/pico-playground/tree/master/apps/usb_sound_card) in pico-playground of pico-SDK
+  - mute function and USB-audio rate feedback is implemented
 * [Sample code](https://files.waveshare.com/wiki/Pico-1.3-LCD/RP2040-LCD-LVGL.zip) of [Waveshare Pico LCD 2](https://www.waveshare.com/wiki/Pico-LCD-2) (but I do not use LVGL functions)
 * [bitmap-OSD-font](https://github.com/frisnit/bitmap-OSD-font/tree/master) (font.c)
 
