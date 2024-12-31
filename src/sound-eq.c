@@ -18,10 +18,16 @@
 #include "pico/util/datetime.h"
 #include "DEV_Config.h"
 
-#include "draw.h"
-
 ///////// add filtering
+#include "draw.h"
 #include "eq.h"
+
+#define DEBUG_FEEDBACK 0 // for debuggin USB audio rate feedback
+
+#define BUFFER_NUM 16 // buffer for I2S (corresponds to msec)
+#if DEBUG_FEEDBACK
+int numFreeBuf;
+#endif
 
 #define EQ_CH 2
 
@@ -278,8 +284,15 @@ static void drawAxis(void) {
 
   drawText(LCD_WIDTH/2-60, LCD_HEIGHT - 15, modeStr[mode], GREEN);
   
+#if DEBUG_FEEDBACK
+  char str[100];
+  sprintf(str, "%d", numFreeBuf);
+  drawText(LCD_WIDTH/2-10, 1, str, RED);
+#else
   if(sw) drawText(LCD_WIDTH/2-10, 1, " EQ ON", RED);
   else   drawText(LCD_WIDTH/2-10, 1, "THROUGH", BLUE);
+#endif
+  
 }  
 
 static void drawResponse(BiQuadCoeffs c[]) {
@@ -426,7 +439,10 @@ CU_REGISTER_DEBUG_PINS(audio_timing)
 #undef AUDIO_SAMPLE_FREQ
 #define AUDIO_SAMPLE_FREQ(frq) (uint8_t)(frq), (uint8_t)((frq >> 8)), (uint8_t)((frq >> 16))
 
-#define AUDIO_MAX_PACKET_SIZE(freq) (uint8_t)(((freq + 999) / 1000) * 4)
+// if USB-audio rate feedback is applied, the packet size will increase occasionally
+//#define AUDIO_MAX_PACKET_SIZE(freq) (uint8_t)(((freq + 999) / 1000) * 4)
+#define AUDIO_MAX_PACKET_SIZE(freq) (uint8_t)(((freq + 2999) / 1000) * 4)
+
 #define FEATURE_MUTE_CONTROL 1u
 #define FEATURE_VOLUME_CONTROL 2u
 
@@ -642,28 +658,37 @@ static struct {
 
 static struct audio_buffer_pool *producer_pool;
 
+//for USB-audio rate feedback, number of vacant buffers is used
+static int countFreeBuffers(void) {
+  int i = 0;
+  
+  audio_buffer_t *audio_buffer = producer_pool->free_list;
+  while(audio_buffer != NULL) {
+    audio_buffer = audio_buffer->next;
+    i++;
+  }
+  return i;
+}
+
 #define FADE_SPEED1 100
 #define FADE_SPEED2 40
 
 static void _as_audio_packet(struct usb_endpoint *ep) {
   static int32_t vol2 = 0;
-
-  assert(ep->current_transfer);
+  static int cnt = 0;
+  
   struct usb_buffer *usb_buffer = usb_current_out_packet_buffer(ep);
-  DEBUG_PINS_SET(audio_timing, 1);
-  // todo deal with blocking correctly
   struct audio_buffer *audio_buffer = take_audio_buffer(producer_pool, true);
-  DEBUG_PINS_CLR(audio_timing, 1);
-  assert(!(usb_buffer->data_len & 3u));
   audio_buffer->sample_count = usb_buffer->data_len / 4;
-  assert(audio_buffer->sample_count);
-  assert(audio_buffer->max_sample_count >= audio_buffer->sample_count);
   uint16_t vol_mul = audio_state.vol_mul;
 
+  int16_t *out = (int16_t *) audio_buffer->buffer->bytes;
+  int16_t *in = (int16_t *) usb_buffer->data;
+
+  // add mute function with gentle fading
   if(audio_state.mute) {
     vol_mul = 1;
   }
-  //volume fade
   if(vol2 != vol_mul) {
     int32_t diff = (vol_mul - vol2) / FADE_SPEED1;
     if      (diff >  FADE_SPEED2) diff =  FADE_SPEED2;
@@ -673,14 +698,13 @@ static void _as_audio_packet(struct usb_endpoint *ep) {
   if     (vol2 < vol_mul) vol2++;
   else if(vol2 > vol_mul) vol2--;
   
-  int16_t *out = (int16_t *) audio_buffer->buffer->bytes;
-  int16_t *in = (int16_t *) usb_buffer->data;
   for (int i = 0; i < audio_buffer->sample_count * 2; i+=2) {
     out[i  ] = (filterR(in[i  ]) * vol2) >> 15u;
     out[i+1] = (filterL(in[i+1]) * vol2) >> 15u;
   }
 
   give_audio_buffer(producer_pool, audio_buffer);
+
   // keep on truckin'
   usb_grow_transfer(ep->current_transfer, 1);
   usb_packet_done(ep);
@@ -694,8 +718,14 @@ static void _as_sync_packet(struct usb_endpoint *ep) {
   assert(buffer->data_max >= 3);
   buffer->data_len = 3;
 
+  int freeBuf = countFreeBuffers();
+#if DEBUG_FEEDBACK
+  numFreeBuf = freeBuf;
+#endif
+  int feedbackvalue = (freeBuf - BUFFER_NUM / 2) * 6;
+  
   // todo lie thru our teeth for now
-  uint feedback = (audio_state.freq << 14u) / 1000u;
+  uint feedback = ((audio_state.freq + feedbackvalue) << 14u) / 1000u;
 
   buffer->data[0] = feedback;
   buffer->data[1] = feedback >> 8u;
@@ -992,7 +1022,7 @@ static void core1_worker() {
 }
 
 int main(void) {
-  //    set_sys_clock_48mhz();
+  //  set_sys_clock_48mhz();
     
   stdout_uart_init();
 
@@ -1021,7 +1051,8 @@ int main(void) {
     .sample_stride = 4
   };
 
-  producer_pool = audio_new_producer_pool(&producer_format, 8, 48); // todo correct size
+  //  producer_pool = audio_new_producer_pool(&producer_format, 8, 48); // todo correct size
+  producer_pool = audio_new_producer_pool(&producer_format, BUFFER_NUM, 50); // todo correct size
   bool __unused ok;
   struct audio_i2s_config config = {
     .data_pin = PICO_AUDIO_I2S_DATA_PIN,
@@ -1048,6 +1079,11 @@ int main(void) {
   // MSD is irq driven
   while (1) {
     sense();
+#if DEBUG_FEEDBACK
+    drawResponse(coeff);
+    sendImage();
+    lcdOn();
+#endif
     //        __wfi();
   }
 }
