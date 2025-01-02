@@ -29,12 +29,18 @@
 int numFreeBuf;
 #endif
 
-#define EQ_CH 2
-
-#define F1_DEF 100
-#define F2_DEF 1000
-#define BW_DEF 4
-#define GAIN_DEF 0
+#define EQ_CH 2 // channnel of parametric equalizer, max = 4
+#if EQ_CH == 4
+const int defaultFreq[] = {100, 300, 1000, 3000};
+#elif EQ_CH == 3
+const int defaultFreq[] = {100, 500, 3000};
+#else
+const int defaultFreq[] = {100, 1000};
+#endif
+  
+#define DEFAULT_BW 3
+#define DEFAULT_GAIN 0
+#define FREQ_STEP 1.25992104989
 
 #define FREQ_SAMPLE 48000.0
 
@@ -45,12 +51,7 @@ typedef struct {
   double totalGain;
 } Settings;
 
-Settings setting = {
-  {F1_DEF, F2_DEF},
-  {BW_DEF, BW_DEF}, // FWHM (full width at half maximum) in octave
-  {GAIN_DEF, -GAIN_DEF}, // in dB
-  0
-};
+Settings setting;
 
 #define SHIFT_C 20 // fixed point for coeffs
 #define SHIFT_V 16 // fixed point for value
@@ -59,7 +60,7 @@ BiQuadCoeffs coeff[EQ_CH];
 typedef struct {
   int64_t a1, a2, b0, b1, b2; // filter fixed point coeffs
 } BinCoeffs;
-BinCoeffs bc[EQ_CH];
+BinCoeffs bc[EQ_CH]; // binary coefficient
 int64_t gainBC = (1 << SHIFT_V);
 
 volatile bool sw = true; // switch of filter on/off
@@ -117,7 +118,8 @@ static int32_t filterR(int64_t in) {
 #include <hardware/watchdog.h>
 #include <string.h>
 
-#define SAVE_FLAG 0xCC
+#define SAVE_FLAG EQ_CH
+
 // W25Q16JVの最終ブロック(Block31)のセクタ0の先頭アドレス = 0x1F0000
 const uint32_t FLASH_TARGET_OFFSET = 0x1F0000;
 static void core1_worker();
@@ -171,11 +173,22 @@ void lcdOn(void) {
   lcdOnTime = time_us_64();
 }
 
+
+void initSettings(void) {
+  for(int i = 0; i < EQ_CH; i++) {
+    setting.freqCenter[i] = defaultFreq[i];
+    setting.bandWidth[i] = DEFAULT_BW;
+    setting.gain[i] = DEFAULT_GAIN;
+  }
+  setting.totalGain = 0;
+}
+
 void myInit(void) {
   if(DEV_Module_Init()!=0){
     return;
   }
 
+  initSettings();
   load_setting_from_flash();
   
   /*LCD Init*/
@@ -218,18 +231,17 @@ void myInit(void) {
 #define X_TO_FREQ(x) exp(((double)(x-MARGIN_LEFT)/(LCD_WIDTH-MARGIN_LEFT)) * (log(GRAPH_FREQ_MAX) - log(GRAPH_FREQ_MIN)) + log(GRAPH_FREQ_MIN))
 #define GAIN_TO_Y(gain) (MARGIN_TOP + (LCD_HEIGHT - (MARGIN_TOP + MARGIN_BOTTOM)) * (1 - (((double)(gain) - GRAPH_GAIN_MIN) / (GRAPH_GAIN_MAX - GRAPH_GAIN_MIN))))
 
-#define MODENUM 8
-int mode;
+#define MODENUM (EQ_CH * 3 + 2)
+#define MODE_SETTING (MODENUM - 2)
+#define MODE_TOTALGAIN (MODENUM - 1)
+int mode = MODENUM - 1;
 
 char *modeStr[] = {
-  " EQ1 GAIN",
-  " EQ1 FREQ",
-  " EQ1 WIDTH",
-  " EQ2 GAIN",
-  " EQ2 FREQ",
-  " EQ2 WIDTH",
-  "TOTAL GAIN",
-  " SETTINGS"
+  " EQX GAIN",
+  " EQX FREQ",
+  " EQX WIDTH",
+  " SETTINGS",
+  "TOTAL GAIN"
 };
 
 static void drawAxis(void) {
@@ -240,21 +252,6 @@ static void drawAxis(void) {
       image[y][x] = 0xFFFF;
     }
   }
-  for(int x = MARGIN_LEFT; x < LCD_WIDTH; x++) {
-    drawPoint(x, GAIN_TO_Y(-20), COL(25, 25, 25));
-    drawPoint(x, GAIN_TO_Y(-15), COL(28, 28, 28));
-    drawPoint(x, GAIN_TO_Y(-10), COL(25, 25, 25));
-    drawPoint(x, GAIN_TO_Y( -5), COL(28, 28, 28));
-    drawPoint(x, GAIN_TO_Y(  0), BLACK);
-    drawPoint(x, GAIN_TO_Y(  5), COL(28, 28, 28));
-    drawPoint(x, GAIN_TO_Y( 10), COL(25, 25, 25));
-    drawPoint(x, GAIN_TO_Y( 15), COL(28, 28, 28));
-  }
-  drawText(2, GAIN_TO_Y(  0) - 7, "  0", BLACK);
-  drawText(2, GAIN_TO_Y( 10) - 7, " 10", BLACK);
-  drawText(2, GAIN_TO_Y(-10) - 7, "-10", BLACK);
-  drawText(2, GAIN_TO_Y(-20) - 7, "-20", BLACK);
-  
   for(int y = MARGIN_TOP; y < LCD_HEIGHT - MARGIN_BOTTOM; y++) {
     drawPoint(FREQ_TO_X(   20), y, COL(28, 28, 28));
     drawPoint(FREQ_TO_X(   40), y, COL(28, 28, 28));
@@ -277,12 +274,38 @@ static void drawAxis(void) {
   drawText(FREQ_TO_X(1000) - 12, LCD_HEIGHT - 38, "1K", BLACK);
   drawText(FREQ_TO_X(10000) - 18, LCD_HEIGHT - 38, "10K", BLACK);
 
+  for(int x = MARGIN_LEFT; x < LCD_WIDTH; x++) {
+    drawPoint(x, GAIN_TO_Y(-20), COL(25, 25, 25));
+    drawPoint(x, GAIN_TO_Y(-15), COL(28, 28, 28));
+    drawPoint(x, GAIN_TO_Y(-10), COL(25, 25, 25));
+    drawPoint(x, GAIN_TO_Y( -5), COL(28, 28, 28));
+    drawPoint(x, GAIN_TO_Y(  0), BLACK);
+    drawPoint(x, GAIN_TO_Y(  5), COL(28, 28, 28));
+    drawPoint(x, GAIN_TO_Y( 10), COL(25, 25, 25));
+    drawPoint(x, GAIN_TO_Y( 15), COL(28, 28, 28));
+  }
+  drawText(2, GAIN_TO_Y(  0) - 7, "  0", BLACK);
+  drawText(2, GAIN_TO_Y( 10) - 7, " 10", BLACK);
+  drawText(2, GAIN_TO_Y(-10) - 7, "-10", BLACK);
+  drawText(2, GAIN_TO_Y(-20) - 7, "-20", BLACK);
+  
   drawText(0, 1, "EQ ON/OFF", WHITE);
   drawText(0, LCD_HEIGHT - 15, "SEL", WHITE);
-  drawText(LCD_WIDTH-61, 1, mode == 7 ? " SAVE" : "   UP", WHITE);
-  drawText(LCD_WIDTH-61, LCD_HEIGHT - 15, mode == 7 ? "RESET" : " DOWN", WHITE);
+  drawText(LCD_WIDTH-61, 1, mode == MODE_SETTING ? " SAVE" : "   UP", WHITE);
+  drawText(LCD_WIDTH-61, LCD_HEIGHT - 15, mode == MODE_SETTING ? "RESET" : " DOWN", WHITE);
 
-  drawText(LCD_WIDTH/2-60, LCD_HEIGHT - 15, modeStr[mode], GREEN);
+  if(mode < EQ_CH * 3) {
+    char p[20];
+    strcpy(p, modeStr[mode % 3]);
+    p[3] = '1' + mode / 3;
+    drawText(LCD_WIDTH/2-60, LCD_HEIGHT - 15, p, GREEN);
+    for(int y = MARGIN_TOP; y < LCD_HEIGHT - MARGIN_BOTTOM; y++) {
+      drawPoint(FREQ_TO_X(setting.freqCenter[mode / 3]), y, GREEN);
+    }
+  }
+  else {
+    drawText(LCD_WIDTH/2-60, LCD_HEIGHT - 15, modeStr[mode % 3 + 3], GREEN);
+  }
   
 #if DEBUG_FEEDBACK
   char str[100];
@@ -353,10 +376,10 @@ static void sense(void) {
       mode = (mode + 1) % MODENUM;
     }
     else if(rt) {
-      if(mode == 6) {
+      if(mode == MODE_TOTALGAIN) {
 	setting.totalGain++;
       }
-      else if(mode == 7) {
+      else if(mode == MODE_SETTING) {
 	save_setting_to_flash(); // save data (auto reset)
       }
       else {
@@ -366,27 +389,21 @@ static void sense(void) {
 	  setting.gain[ch]++;
 	  break;
 	case 1:
-	  setting.freqCenter[ch] *= 1.41421356;
+	  setting.freqCenter[ch] *= FREQ_STEP;
 	  break;
 	case  2:
-	  setting.bandWidth[ch] *= 1.41421356;
+	  setting.bandWidth[ch] *= FREQ_STEP;
 	  break;
 	}
       }
     }
     else if(rb) {
-      if(mode == 6) {
+      if(mode == MODE_TOTALGAIN) {
 	setting.totalGain--;
       }
-      else if(mode == 7) {
+      else if(mode == MODE_SETTING) {
 	// restore original setting
-	setting.freqCenter[0] = F1_DEF;
-	setting.freqCenter[1] = F2_DEF;
-	setting.bandWidth[0] = BW_DEF;
-	setting.bandWidth[1] = BW_DEF;
-	setting.gain[0] = GAIN_DEF;
-	setting.gain[1] = -GAIN_DEF;
-	setting.totalGain = 0;
+	initSettings();
       }
       else {
 	int ch = mode / 3;
@@ -395,10 +412,10 @@ static void sense(void) {
 	  setting.gain[ch]--;
 	  break;
 	case 1:
-	  setting.freqCenter[ch] /= 1.41421356;
+	  setting.freqCenter[ch] /= FREQ_STEP;
 	  break;
-	case  2:
-	  setting.bandWidth[ch] /= 1.41421356;
+	case 2:
+	  setting.bandWidth[ch] /= FREQ_STEP;
 	  break;
 	}
       }
@@ -694,9 +711,9 @@ static void _as_audio_packet(struct usb_endpoint *ep) {
     if      (diff >  FADE_SPEED2) diff =  FADE_SPEED2;
     else if (diff < -FADE_SPEED2) diff = -FADE_SPEED2;
     vol2 += diff;
+    if     (vol2 < vol_mul) vol2++;
+    else if(vol2 > vol_mul) vol2--;
   }
-  if     (vol2 < vol_mul) vol2++;
-  else if(vol2 > vol_mul) vol2--;
   
   for (int i = 0; i < audio_buffer->sample_count * 2; i+=2) {
     out[i  ] = (filterR(in[i  ]) * vol2) >> 15u;
@@ -722,7 +739,7 @@ static void _as_sync_packet(struct usb_endpoint *ep) {
 #if DEBUG_FEEDBACK
   numFreeBuf = freeBuf;
 #endif
-  int feedbackvalue = (freeBuf - BUFFER_NUM / 2) * 6;
+  int feedbackvalue = (freeBuf - BUFFER_NUM / 2) * 5;
   
   // todo lie thru our teeth for now
   uint feedback = ((audio_state.freq + feedbackvalue) << 14u) / 1000u;
