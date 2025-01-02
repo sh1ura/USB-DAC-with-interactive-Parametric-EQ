@@ -1,6 +1,6 @@
 # USB-DAC with interactive Parametric EQ
 
-Raspberry-Pi Pico based USB DAC with 2ch parametric equalizer
+Raspberry-Pi Pico based USB DAC with parametric equalizer
 
 ![DSC_2694_01ts](https://github.com/user-attachments/assets/085e5765-5baa-4c8d-9bde-daaae47f6dad)
 
@@ -8,6 +8,7 @@ Raspberry-Pi Pico based USB DAC with 2ch parametric equalizer
 * No soldering needed (if you use genuine Raspberry Pi Pico with pinheaders)
 * Easy to operate with four buttons and large LCD display
 * Setting can be saved into the flash memory (it is automatically recalled when it is powered on)
+* Number of parametric equalizer can be changed (from 2 to 4)
 
 ## Necessary Parts
 
@@ -26,16 +27,13 @@ Then this board will be recognized as "Pico Sound Card with EQ"
 ## Operation
 
 * Top-Left button toggles EQ (EQ ON or THROUGH)
-* Bottom-Left button (SEL) switches 8 modes
-  - EQ1 GAIN
-  - EQ1 FREQ
-  - EQ1 WIDTH
-  - EQ2 GAIN
-  - EQ2 FREQ
-  - EQ2 WIDTH
+* Bottom-Left button (SEL) switches modes (n = number of parametric equalizer),
   - TOTAL GAIN
+  - EQn GAIN
+  - EQn FREQ
+  - EQn WIDTH
   - SETTINGS (save settings to flash or restore factory settings)
-* Top-Right and Bottom-Right buttons increase / decrease values (in first 7 modes)
+* Top-Right and Bottom-Right buttons increase / decrease values (except SETTINGS mode)
 
 Operation: https://www.youtube.com/watch?v=vReo5DAdtEo
 
