@@ -8,7 +8,7 @@ Raspberry-Pi Pico based USB DAC with parametric equalizer
 
 ## Ver.2 : ready for room EQ compensation
   
-![peq1](https://github.com/user-attachments/assets/26ee6bd6-c989-4141-9d0c-000d5f50ffac)
+![peq1](https://github.com/user-attachments/assets/61e4f219-03b9-48d3-873b-3ad1a90c01a4)
 Green line shows the center frequency of EQ2. The frequency (250Hz) is shown on top as well.
 
 * 4ch fully controllable IIR (BiQuad) filters
@@ -18,8 +18,9 @@ Green line shows the center frequency of EQ2. The frequency (250Hz) is shown on 
 * Rapid value change by press and hold the button
 * Current sample frequency is now displayed
   
-![peq2](https://github.com/user-attachments/assets/83a00a3c-b2c8-41a1-8a6d-647b74b13bc5)
-Sample frequency is shown on top. If the frequency changes, LCD is automatically turned on and shows it 
+![peq2](https://github.com/user-attachments/assets/f85f5d23-710e-4831-bf11-8324eb135083)
+Sample frequency is shown on top. If the frequency changes, LCD is automatically turned on and shows it.
+You can save or reset parameters here.
 
 ## Necessary Parts
 
