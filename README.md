@@ -75,6 +75,7 @@ Then this board will be recognized as "Pico Sound Card with EQ"
 * "EQ filters" window shows calculated EQ parameters
 
 ### Result (measured frequency response with and without equalizer)
+![result](https://github.com/user-attachments/assets/5c1578c2-36f0-4bf9-8b50-9b4f43e6ff2d)
 * Red curve shows the measured frequency response without EQ
 * Green curve shows measured frequency response using this USB-DAC with EQ
 
