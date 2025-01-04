@@ -32,23 +32,22 @@ void sendImage(void) {
 }
 
 #include "font.c"
-char table[] = "./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^-";
 
 void drawFont(int x, int y, char c, uint16_t col) {
-  int i, j;
+  int i, j, pos;
 
-  for(i = 0; ; i++) {
-    if(table[i] == '\0') {
-      return;
-    }
-    if(table[i] == c) {
-      c = i;
+  for(i = 0; fontData[i].c != '\0'; i++) {
+    if(fontData[i].c == c) {
       break;
     }
   }
-
+  if(fontData[i].c == '\0') {
+    return; // not found
+  }
+  pos = i;
+  
   for(j = 0; j < 14; j++) {
-    unsigned int f = vcr_font[c * 14 + j];
+    unsigned int f = fontData[pos].data[j];
     for(i = 11; i >= 0; i--) {
       if(f & 1) {
 	drawPoint(x + i, y + j, col);

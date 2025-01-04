@@ -282,9 +282,9 @@ static void drawAxis(void) {
     drawPoint(FREQ_TO_X(10000), y, LGRAY);
     drawPoint(FREQ_TO_X(20000), y, COL(28, 28, 28));
   }
-  drawText(FREQ_TO_X(100) - 18, LCD_HEIGHT - 38, "100", BLACK);
-  drawText(FREQ_TO_X(1000) - 12, LCD_HEIGHT - 38, "1K", BLACK);
-  drawText(FREQ_TO_X(10000) - 18, LCD_HEIGHT - 38, "10K", BLACK);
+  drawText(FREQ_TO_X(100) - 17, LCD_HEIGHT - 38, "100", BLACK);
+  drawText(FREQ_TO_X(1000) - 11, LCD_HEIGHT - 38, "1k", BLACK);
+  drawText(FREQ_TO_X(10000) - 17, LCD_HEIGHT - 38, "10k", BLACK);
 
   for(int x = MARGIN_LEFT; x < LCD_WIDTH; x++) {
     drawPoint(x, GAIN_TO_Y(-20), COL(25, 25, 25));
@@ -326,19 +326,19 @@ static void drawAxis(void) {
     switch(mode % 3) {
     case 0: // freq
       if(setting.freqCenter[ch] < 1000.0) {
-	sprintf(str, "%dHZ", (int)(setting.freqCenter[ch] + 0.001));
+	sprintf(str, "%dHz", (int)(setting.freqCenter[ch] + 0.001));
       }
       else {
-	sprintf(str, "%.1fKHZ", setting.freqCenter[ch] / 1000 + 0.001);
+	sprintf(str, "%.1fkHz", setting.freqCenter[ch] / 1000 + 0.001);
       }
       drawText(LCD_WIDTH/2-20, 1, str, CYAN);
       break;
     case 1: // gain
-      sprintf(str, "%.1fDB", setting.gain[ch] + 0.001);
+      sprintf(str, "%.1fdB", setting.gain[ch] + 0.001);
       drawText(LCD_WIDTH/2-20, 1, str, CYAN);
       break;
     case 2: // bandwidth
-      sprintf(str, "%.2fOCT", setting.bandWidth[ch] + 0.001);
+      sprintf(str, "%.2foct", setting.bandWidth[ch] + 0.001);
       drawText(LCD_WIDTH/2-20, 1, str, CYAN);
       break;
     }
@@ -346,11 +346,11 @@ static void drawAxis(void) {
   else {
     drawText(LCD_WIDTH/2-60, LCD_HEIGHT - 15, modeStr[mode % 3 + 3], GREEN);
     if(mode == MODE_TOTALGAIN) {
-      sprintf(str, "%.1fDB", setting.totalGain + 0.001);
+      sprintf(str, "%.1fdB", setting.totalGain + 0.001);
       drawText(LCD_WIDTH/2-20, 1, str, CYAN);
     }
     else if(mode == MODE_SETTING) {
-      sprintf(str, "%.1fKHZ", audio_state.freq / 1000.0);
+      sprintf(str, "%.1fkHz", audio_state.freq / 1000.0);
       drawText(LCD_WIDTH/2-20, 1, str, WHITE);
     }
   }
