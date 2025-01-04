@@ -11,12 +11,12 @@ Raspberry-Pi Pico based USB DAC with parametric equalizer
 ![peq1](https://github.com/user-attachments/assets/26ee6bd6-c989-4141-9d0c-000d5f50ffac)
 Green line shows the center frequency of EQ2. The frequency (250Hz) is shown on top as well.
 
-* 4ch fully controllable IIR filters
+* 4ch fully controllable IIR (BiQuad) filters
 * Precise tuning is possible for all parameters
-  - Steps changed by one click of button is smaller than previous version
-  - The values are shown numerically as well
+  - Steps changed by one button click is smaller than previous version
+  - The values are displayed numerically as well
 * Rapid value change by press and hold the button
-* Sample frequency is now displayed
+* Current sample frequency is now displayed
   
 ![peq2](https://github.com/user-attachments/assets/83a00a3c-b2c8-41a1-8a6d-647b74b13bc5)
 Sample frequency is shown on top. If the frequency changes, LCD is automatically turned on and shows it 
@@ -37,7 +37,7 @@ Then this board will be recognized as "Pico Sound Card with EQ"
 
 ## Operation
 
-* Top-Left button toggles EQ (EQ ON or THROUGH)
+* Top-Left button toggles EQ (EQ/ON or OFF)
 * Bottom-Left button (SEL) switches modes (n = number of parametric equalizer),
   - TOTAL GAIN
   - EQn FREQ
@@ -65,18 +65,18 @@ Then this board will be recognized as "Pico Sound Card with EQ"
 
 * [Implementation of BiQuad digital filter in C](https://www.utsbox.com/?page_id=523)
 
-## Example of room EQ compensation using REW
+## Example of room EQ compensation using [REW](https://www.roomeqwizard.com/)
 
 ### Calculating parameter
 ![eq](https://github.com/user-attachments/assets/36b21219-ed9d-4f15-886f-ccbe9e356994)
 * Brown curve shows the measured frequency response without EQ
 * Blue curve shows the target frequency response
 * Red curve shows simulated (predicted) frequency response if calculated EQ is applied
-* "EQ filters" window shows calculated EQ parameters
+* "EQ filters" window shows parameters of calculated EQ
 
 ### Result (measured frequency response with and without equalizer)
 ![result](https://github.com/user-attachments/assets/5c1578c2-36f0-4bf9-8b50-9b4f43e6ff2d)
 * Red curve shows the measured frequency response without EQ
 * Green curve shows measured frequency response using this USB-DAC with EQ
 
-Please see that the measured curve matches predicted curve very well
+Please see that the measured curve matches predicted curve very well.
