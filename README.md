@@ -47,6 +47,8 @@ Then this board will be recognized as "Pico Sound Card with EQ"
   - SETTINGS (save settings to flash or restore factory settings)
 * Top-Right and Bottom-Right buttons increase / decrease values (except SETTINGS mode)
 
+Please see the movies at https://youtu.be/eDUhabNW9hQ for operation.
+
 ## Limitations and tips
 
 * When the settings are saved to flash memory, the sound card stops (the board reboots)
