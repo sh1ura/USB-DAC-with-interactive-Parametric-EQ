@@ -22,6 +22,15 @@
 #include "draw.h"
 #include "eq.h"
 
+static struct {
+  uint32_t freq;
+  int16_t volume;
+  int16_t vol_mul;
+  bool mute;
+} audio_state = {
+  .freq = 48000,
+};
+
 #define DEBUG_FEEDBACK 0 // for debuggin USB audio rate feedback
 
 #define BUFFER_NUM 16 // buffer for I2S (corresponds to msec)
@@ -29,7 +38,7 @@
 int numFreeBuf;
 #endif
 
-#define EQ_CH 2 // channnel of parametric equalizer, max = 4
+#define EQ_CH 4 // channnel of parametric equalizer, max = 4
 #if EQ_CH == 4
 const int defaultFreq[] = {100, 300, 1000, 3000};
 #elif EQ_CH == 3
@@ -40,9 +49,10 @@ const int defaultFreq[] = {100, 1000};
   
 #define DEFAULT_BW 3
 #define DEFAULT_GAIN 0
-#define FREQ_STEP 1.25992104989
+#define GAIN_STEP 0.2
+#define BW_STEP 1.18920711 // 1/4 octave
 
-#define FREQ_SAMPLE 48000.0
+int currentFreq = 48000;
 
 typedef struct {
   double freqCenter[EQ_CH];
@@ -65,12 +75,11 @@ int64_t gainBC = (1 << SHIFT_V);
 
 volatile bool sw = true; // switch of filter on/off
 
-static void drawResponse(BiQuadCoeffs c[]);
+static void drawResponse(void);
 
 static void calcBinCoeffs(void) {
-
   for(int i = 0; i < EQ_CH; i++) {
-    coeff[i] = calcCoeffs(FREQ_SAMPLE, setting.freqCenter[i] , setting.bandWidth[i], setting.gain[i]);
+    coeff[i] = calcCoeffs((double)currentFreq, setting.freqCenter[i] , setting.bandWidth[i], setting.gain[i]);
     bc[i].a1 = coeff[i].a1 * (1 << SHIFT_C) + 0.5;
     bc[i].a2 = coeff[i].a2 * (1 << SHIFT_C) + 0.5;
     bc[i].b0 = coeff[i].b0 * (1 << SHIFT_C) + 0.5;
@@ -81,37 +90,37 @@ static void calcBinCoeffs(void) {
 }
 
 static int32_t filterL(int64_t in) {
-  static int64_t in1[EQ_CH], in2[EQ_CH], out[EQ_CH], out1[EQ_CH], out2[EQ_CH];
+  static int64_t in1[EQ_CH], in2[EQ_CH], out1[EQ_CH], out2[EQ_CH], out;
     
   if(!sw) {
     return in;
   }
   in <<= SHIFT_V;
   for(int i = 0; i < EQ_CH; i++) {
-    out[i] = bc[i].b0 * in + bc[i].b1 * in1[i] + bc[i].b2 * in2[i] - bc[i].a1 * out1[i] - bc[i].a2 * out2[i];
-    out[i] = out[i] >> SHIFT_C;
+    out = bc[i].b0 * in + bc[i].b1 * in1[i] + bc[i].b2 * in2[i] - bc[i].a1 * out1[i] - bc[i].a2 * out2[i];
+    out >>= SHIFT_C;
     in2[i] = in1[i];    in1[i] = in;
-    out2[i] = out1[i];  out1[i] = out[i];
-    in = out[i];
+    out2[i] = out1[i];  out1[i] = out;
+    in = out;
   }
-  return in / gainBC;
+  return out / gainBC;
 }
 
 static int32_t filterR(int64_t in) {
-  static int64_t in1[EQ_CH], in2[EQ_CH], out[EQ_CH], out1[EQ_CH], out2[EQ_CH];
+  static int64_t in1[EQ_CH], in2[EQ_CH], out1[EQ_CH], out2[EQ_CH], out;
     
   if(!sw) {
     return in;
   }
   in <<= SHIFT_V;
   for(int i = 0; i < EQ_CH; i++) {
-    out[i] = bc[i].b0 * in + bc[i].b1 * in1[i] + bc[i].b2 * in2[i] - bc[i].a1 * out1[i] - bc[i].a2 * out2[i];
-    out[i] = out[i] >> SHIFT_C;
+    out = bc[i].b0 * in + bc[i].b1 * in1[i] + bc[i].b2 * in2[i] - bc[i].a1 * out1[i] - bc[i].a2 * out2[i];
+    out >>= SHIFT_C;
     in2[i] = in1[i];    in1[i] = in;
-    out2[i] = out1[i];  out1[i] = out[i];
-    in = out[i];
+    out2[i] = out1[i];  out1[i] = out;
+    in = out;
   }
-  return in / gainBC;
+  return out / gainBC;
 }
 
 #include <hardware/flash.h>
@@ -163,14 +172,15 @@ void load_setting_from_flash(void) {
 #define LCD_BACKLIGHT_PIN 13
 
 #define LCDTIME 10000000 // LCD turn off timer (10sec)
-#define CHATTER 200000 // avoid chattering
-volatile int64_t lcdOnTime;
+#define CHATTER_WAIT 200000 // wait for avoid chattering
+#define FIRST_CLICK_WAIT 500000 // wait of repeating key-in
+volatile int64_t keyOnTime;
 volatile bool lcdStatus = false;
 
 void lcdOn(void) {
   gpio_put(LCD_BACKLIGHT_PIN, true);
   lcdStatus = true;
-  lcdOnTime = time_us_64();
+  keyOnTime = time_us_64();
 }
 
 
@@ -210,9 +220,9 @@ void myInit(void) {
   gpio_init(LCD_KEY_RB);
   gpio_set_dir(LCD_KEY_RB, GPIO_IN);
   gpio_pull_up(LCD_KEY_RB);
-    
+
   calcBinCoeffs();
-  drawResponse(coeff);
+  drawResponse();
   sendImage();
   lcdOn();
 }
@@ -237,14 +247,16 @@ void myInit(void) {
 int mode = MODENUM - 1;
 
 char *modeStr[] = {
-  " EQX GAIN",
   " EQX FREQ",
+  " EQX GAIN",
   " EQX WIDTH",
   " SETTINGS",
   "TOTAL GAIN"
 };
 
 static void drawAxis(void) {
+  char str[100];
+
   clearImage(BLACK);
 
   for(int y = 20; y < LCD_HEIGHT - 20; y++){
@@ -289,7 +301,15 @@ static void drawAxis(void) {
   drawText(2, GAIN_TO_Y(-10) - 7, "-10", BLACK);
   drawText(2, GAIN_TO_Y(-20) - 7, "-20", BLACK);
   
-  drawText(0, 1, "EQ ON/OFF", WHITE);
+  drawText(0, 1, "EQ", WHITE);
+  if(sw) {
+    drawText(12 * 3, 1, "ON", RED);
+    drawText(12 * 5, 1, "/OFF", WHITE);
+  }
+  else {
+    drawText(12 * 3, 1, "ON/", WHITE);
+    drawText(12 * 6, 1, "OFF", BLUE);
+  }
   drawText(0, LCD_HEIGHT - 15, "SEL", WHITE);
   drawText(LCD_WIDTH-61, 1, mode == MODE_SETTING ? " SAVE" : "   UP", WHITE);
   drawText(LCD_WIDTH-61, LCD_HEIGHT - 15, mode == MODE_SETTING ? "RESET" : " DOWN", WHITE);
@@ -302,23 +322,46 @@ static void drawAxis(void) {
     for(int y = MARGIN_TOP; y < LCD_HEIGHT - MARGIN_BOTTOM; y++) {
       drawPoint(FREQ_TO_X(setting.freqCenter[mode / 3]), y, GREEN);
     }
+    int ch = mode / 3;
+    switch(mode % 3) {
+    case 0: // freq
+      if(setting.freqCenter[ch] < 1000.0) {
+	sprintf(str, "%dHZ", (int)(setting.freqCenter[ch] + 0.001));
+      }
+      else {
+	sprintf(str, "%.1fKHZ", setting.freqCenter[ch] / 1000 + 0.001);
+      }
+      drawText(LCD_WIDTH/2-20, 1, str, CYAN);
+      break;
+    case 1: // gain
+      sprintf(str, "%.1fDB", setting.gain[ch] + 0.001);
+      drawText(LCD_WIDTH/2-20, 1, str, CYAN);
+      break;
+    case 2: // bandwidth
+      sprintf(str, "%.2fOCT", setting.bandWidth[ch] + 0.001);
+      drawText(LCD_WIDTH/2-20, 1, str, CYAN);
+      break;
+    }
   }
   else {
     drawText(LCD_WIDTH/2-60, LCD_HEIGHT - 15, modeStr[mode % 3 + 3], GREEN);
+    if(mode == MODE_TOTALGAIN) {
+      sprintf(str, "%.1fDB", setting.totalGain + 0.001);
+      drawText(LCD_WIDTH/2-20, 1, str, CYAN);
+    }
+    else if(mode == MODE_SETTING) {
+      sprintf(str, "%.1fKHZ", audio_state.freq / 1000.0);
+      drawText(LCD_WIDTH/2-20, 1, str, WHITE);
+    }
   }
   
 #if DEBUG_FEEDBACK
-  char str[100];
   sprintf(str, "%d", numFreeBuf);
   drawText(LCD_WIDTH/2-10, 1, str, RED);
-#else
-  if(sw) drawText(LCD_WIDTH/2-10, 1, " EQ ON", RED);
-  else   drawText(LCD_WIDTH/2-10, 1, "THROUGH", BLUE);
 #endif
-  
 }  
 
-static void drawResponse(BiQuadCoeffs c[]) {
+static void drawResponse(void) {
   double g;
   Complex r;
 
@@ -330,7 +373,7 @@ static void drawResponse(BiQuadCoeffs c[]) {
     r.re = 1;
     r.im = 0;
     for(int i = 0; i < EQ_CH; i++) {
-      r = mul(r, calcResponse(coeff[i], freq, FREQ_SAMPLE));
+      r = mul(r, calcResponse(coeff[i], freq, (double)currentFreq));
     }
     g = 10 * log10(r.re * r.re + r.im * r.im);
     g += setting.totalGain;
@@ -340,91 +383,118 @@ static void drawResponse(BiQuadCoeffs c[]) {
   }
 }
 
-static void sense(void) {
-  static bool status = false;
+double freqStep(double f) {
+  if(f < 100) {
+    return 1.0;
+  }
+  else if(f < 300) {
+    return 10.0;
+  }
+  else if(f < 1000) {
+    return 20.0;
+  }
+  else if(f < 3000) {
+    return 100.0;
+  }
+  else if(f < 10000) {
+    return 200.0;
+  }
+  return 1000.0;
+}
 
+static void sense(void) {
+  static int repeatCount = 0;
+  int64_t curTime;
+  
   int lt = !gpio_get(LCD_KEY_LT);
   int lb = !gpio_get(LCD_KEY_LB);
   int rt = !gpio_get(LCD_KEY_RT);
   int rb = !gpio_get(LCD_KEY_RB);
   
-  if(status) {
-    if((lt || lb || rt || rb) == false) { // release
-      status = false;
+  if((lt || lb || rt || rb) == false) { // key release
+    repeatCount = 0;
+    if(lcdStatus && time_us_64() > keyOnTime + LCDTIME) {
+      // LCD on timer is over
+      gpio_put(LCD_BACKLIGHT_PIN, false);
+      lcdStatus = false;
     }
     return;
   }
 
-  if(lcdStatus && time_us_64() > lcdOnTime + LCDTIME) {
-    gpio_put(LCD_BACKLIGHT_PIN, false);
-    lcdStatus = false;
+  // key press
+  if(!lcdStatus) { //when blackout
+    lcdOn();
+    return;
   }
 
-  if(lt || lb || rt || rb) {
-    status = true;
-    if(time_us_64() < lcdOnTime + CHATTER) { // avoid chattering
+  curTime = time_us_64();
+  if(repeatCount == 0) {
+    if(curTime < keyOnTime + CHATTER_WAIT) { // avoid chattering
       return;
     }
-    if(!lcdStatus) { //when blackout
-      lcdOn();
+  }
+  else if(repeatCount == 1) {
+    if(curTime < keyOnTime + FIRST_CLICK_WAIT) {
       return;
     }
-    if(lt) {
-      sw = !sw; //toggle
+  }
+  repeatCount++;
+  
+  if(lt) {
+    sw = !sw; //toggle
+  }
+  else if(lb) {
+    mode = (mode + 1) % MODENUM;
+  }
+  else if(rt) {
+    if(mode == MODE_TOTALGAIN) {
+      setting.totalGain += GAIN_STEP;
     }
-    else if(lb) {
-      mode = (mode + 1) % MODENUM;
+    else if(mode == MODE_SETTING) {
+      save_setting_to_flash(); // save data (auto reset)
     }
-    else if(rt) {
-      if(mode == MODE_TOTALGAIN) {
-	setting.totalGain++;
-      }
-      else if(mode == MODE_SETTING) {
-	save_setting_to_flash(); // save data (auto reset)
-      }
-      else {
-	int ch = mode / 3;
-	switch(mode % 3) {
-	case 0:
-	  setting.gain[ch]++;
-	  break;
-	case 1:
-	  setting.freqCenter[ch] *= FREQ_STEP;
-	  break;
-	case  2:
-	  setting.bandWidth[ch] *= FREQ_STEP;
-	  break;
-	}
-      }
-    }
-    else if(rb) {
-      if(mode == MODE_TOTALGAIN) {
-	setting.totalGain--;
-      }
-      else if(mode == MODE_SETTING) {
-	// restore original setting
-	initSettings();
-      }
-      else {
-	int ch = mode / 3;
-	switch(mode % 3) {
-	case 0:
-	  setting.gain[ch]--;
-	  break;
-	case 1:
-	  setting.freqCenter[ch] /= FREQ_STEP;
-	  break;
-	case 2:
-	  setting.bandWidth[ch] /= FREQ_STEP;
-	  break;
-	}
+    else {
+      int ch = mode / 3;
+      switch(mode % 3) {
+      case 0:
+	setting.freqCenter[ch] += freqStep(setting.freqCenter[ch]);
+	break;
+      case 1:
+	setting.gain[ch] += GAIN_STEP;
+	break;
+      case  2:
+	setting.bandWidth[ch] *= BW_STEP;
+	break;
       }
     }
-    calcBinCoeffs();
-    drawResponse(coeff);
-    sendImage();
-    lcdOn();
-  }    
+  }
+  else if(rb) {
+    if(mode == MODE_TOTALGAIN) {
+      setting.totalGain -= GAIN_STEP;
+    }
+    else if(mode == MODE_SETTING) {
+      // restore original setting
+      initSettings();
+    }
+    else {
+      int ch = mode / 3;
+      switch(mode % 3) {
+      case 0:
+	setting.freqCenter[ch] -= freqStep(setting.freqCenter[ch] - 1);
+	break;
+      case 1:
+	setting.gain[ch] -= GAIN_STEP;
+	break;
+      case 2:
+	setting.bandWidth[ch] /= BW_STEP;
+	break;
+      }
+    }
+  }
+  calcBinCoeffs();
+  drawResponse();
+  sendImage();
+  lcdOn();
 }
 
 
@@ -663,15 +733,6 @@ const char *_get_descriptor_string(uint index) {
     return "";
   }
 }
-
-static struct {
-  uint32_t freq;
-  int16_t volume;
-  int16_t vol_mul;
-  bool mute;
-} audio_state = {
-  .freq = 44100,
-};
 
 static struct audio_buffer_pool *producer_pool;
 
@@ -1092,12 +1153,20 @@ int main(void) {
   usb_sound_card_init();
     
   multicore_launch_core1(core1_worker);
-  printf("HAHA %04x %04x %04x %04x\n", MIN_VOLUME, DEFAULT_VOLUME, MAX_VOLUME, VOLUME_RESOLUTION);
+  //  printf("HAHA %04x %04x %04x %04x\n", MIN_VOLUME, DEFAULT_VOLUME, MAX_VOLUME, VOLUME_RESOLUTION);
   // MSD is irq driven
   while (1) {
     sense();
+    if(audio_state.freq != currentFreq) { // freq changes
+      currentFreq = audio_state.freq;
+      calcBinCoeffs();
+      mode = MODE_SETTING;
+      drawResponse();
+      sendImage();
+      lcdOn();
+    }
 #if DEBUG_FEEDBACK
-    drawResponse(coeff);
+    drawResponse();
     sendImage();
     lcdOn();
 #endif
