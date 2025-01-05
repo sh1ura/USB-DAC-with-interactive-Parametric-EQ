@@ -66,6 +66,7 @@ Please see the movies at https://youtu.be/eDUhabNW9hQ for operation.
 ## Other resources
 
 * [Implementation of BiQuad digital filter in C](https://www.utsbox.com/?page_id=523)
+* [VCR OSD Mono(Font used for UI)](https://www.dafont.com/vcr-osd-mono.font)
 
 ## Example of room EQ compensation using [REW](https://www.roomeqwizard.com/)
 
