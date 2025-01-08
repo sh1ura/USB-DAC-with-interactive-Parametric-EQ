@@ -1,17 +1,18 @@
 # USB-DAC with interactive Parametric EQ
 
-Raspberry-Pi Pico based USB DAC with parametric equalizer
+Raspberry-Pi Pico based USB DAC with parametric equalizer (PEQ)
 
 * No soldering needed (if you use genuine Raspberry Pi Pico with pinheaders)
 * Easy to operate with four buttons and large LCD display
 * Setting can be saved into the flash memory (it is automatically recalled when it is powered on)
+* Maximum number of PEQ channel is 8 (if you use RP2350. For RP2040, max. ch. is 4)
 
 ## Ver.2 : ready for room EQ compensation
   
 ![peq1](https://github.com/user-attachments/assets/61e4f219-03b9-48d3-873b-3ad1a90c01a4)
 Green line shows the center frequency of EQ2. The frequency (250Hz) is shown on top as well.
 
-* 4ch fully controllable IIR (BiQuad) filters
+* Fully controllable IIR (BiQuad) filters
 * Precise tuning is possible for all parameters
   - Steps changed by one button click is smaller than previous version
   - The values are displayed numerically as well
@@ -24,7 +25,7 @@ You can save or reset parameters here.
 
 ## Necessary Parts
 
-* Raspberry Pi Pico (RP2040) or its compatible board
+* Raspberry Pi Pico (RP2040), Pico2 (RP2350) or compatible board. RP2350 is recommended.
 * [Waveshare Pico LCD 2](https://www.waveshare.com/wiki/Pico-LCD-2) (2inch LCD Display Module)
 * [Waveshare Pico-Audio](https://www.waveshare.com/wiki/Pico-Audio) (I used Rev.1 board with Burr-Brown PCM5101A)
 
@@ -32,7 +33,7 @@ You can save or reset parameters here.
 
 1. Stack three boards
 2. Connect USB to your PC while press and hold BOOTSEL button
-3. Drag and drop soud-eq.uf2 file to the RPI-RP2 icon
+3. Drag and drop soud-eq.uf2 file to the RPI-RP2 (or RP2350) icon
 
 Then this board will be recognized as "Pico Sound Card with EQ"
 
@@ -53,7 +54,7 @@ Please see the movies at https://youtu.be/eDUhabNW9hQ for operation.
 
 * When the settings are saved to flash memory, the sound card stops (the board reboots)
 * High gain (high peak of EQ or high total gain) sometimes causes noise (overflow of 16bit values)
-* If sound is playing back, the UI slows down (If sound stops, UI is sufficiently responsive)
+* RP2040 only : If sound is playing back, the UI slows down (If sound stops, UI is sufficiently responsive. If you use RP2350, the UI is always responsive)
 * If you use VCC-GND YD-RP2040 board (compatibles of Raspberry-Pi Pico), bridge pin 39 and 40 (Vin and Vout) because Waveshare boards are powered from Pin39 (but pin 39 of YD-RP2040 can not supply power)
 ![boardss](https://github.com/user-attachments/assets/48f579f6-3e2b-4a8b-b544-320f3714dd84)
 
