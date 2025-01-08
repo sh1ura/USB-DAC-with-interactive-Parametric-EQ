@@ -16,7 +16,7 @@ pico_sdk_init()
 add_subdirectory(./lib/Config)
 add_subdirectory(./lib/LCD)
 add_subdirectory(./lib/lvgl)
-add_subdirectory(./examples)
+# add_subdirectory(./examples)
 
 include_directories(./examples)
 include_directories(./lib/Config)
