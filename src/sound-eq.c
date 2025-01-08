@@ -33,18 +33,22 @@ static struct {
 
 #define DEBUG_FEEDBACK 0 // for debuggin USB audio rate feedback
 
-#define BUFFER_NUM 16 // buffer for I2S (corresponds to msec)
+#define BUFFER_NUM 8 // buffer for I2S (corresponds to msec)
 #if DEBUG_FEEDBACK
 int numFreeBuf;
 #endif
 
-#define EQ_CH 4 // channnel of parametric equalizer, max = 4
+// RP2040 : EQ_CH <= 4   RP2350 : EQ_CH <= 8
+#define EQ_CH 4 // channnel of parametric equalizer
+
 #if EQ_CH == 4
 const int defaultFreq[] = {100, 300, 1000, 3000};
 #elif EQ_CH == 3
 const int defaultFreq[] = {100, 500, 3000};
-#else
+#elif EQ_CH == 2
 const int defaultFreq[] = {100, 1000};
+#else
+const int defaultFreq[] = {50, 100, 200, 500, 1000, 2000, 5000, 10000};
 #endif
   
 #define DEFAULT_BW 3
@@ -314,6 +318,10 @@ static void drawAxis(void) {
   drawText(LCD_WIDTH-61, 1, mode == MODE_SETTING ? " SAVE" : "   UP", WHITE);
   drawText(LCD_WIDTH-61, LCD_HEIGHT - 15, mode == MODE_SETTING ? "RESET" : " DOWN", WHITE);
 
+#if DEBUG_FEEDBACK
+  sprintf(str, "freeBuf=%d", numFreeBuf);
+  drawText(120, 1, str, RED);
+#else
   if(mode < EQ_CH * 3) {
     char p[20];
     strcpy(p, modeStr[mode % 3]);
@@ -354,10 +362,6 @@ static void drawAxis(void) {
       drawText(LCD_WIDTH/2-20, 1, str, WHITE);
     }
   }
-  
-#if DEBUG_FEEDBACK
-  sprintf(str, "%d", numFreeBuf);
-  drawText(LCD_WIDTH/2-10, 1, str, RED);
 #endif
 }  
 
@@ -528,7 +532,7 @@ CU_REGISTER_DEBUG_PINS(audio_timing)
 
 // if USB-audio rate feedback is applied, the packet size will increase occasionally
 //#define AUDIO_MAX_PACKET_SIZE(freq) (uint8_t)(((freq + 999) / 1000) * 4)
-#define AUDIO_MAX_PACKET_SIZE(freq) (uint8_t)(((freq + 2999) / 1000) * 4)
+#define AUDIO_MAX_PACKET_SIZE(freq) (uint8_t)(((freq + 1999) / 1000) * 4) // for rate control
 
 #define FEATURE_MUTE_CONTROL 1u
 #define FEATURE_VOLUME_CONTROL 2u
@@ -797,12 +801,9 @@ static void _as_sync_packet(struct usb_endpoint *ep) {
   buffer->data_len = 3;
 
   int freeBuf = countFreeBuffers();
-#if DEBUG_FEEDBACK
-  numFreeBuf = freeBuf;
-#endif
   int feedbackvalue = (freeBuf - BUFFER_NUM / 2) * 5;
   
-  // todo lie thru our teeth for now
+  //uint feedback = (audio_state.freq << 14u) / 1000u;
   uint feedback = ((audio_state.freq + feedbackvalue) << 14u) / 1000u;
 
   buffer->data[0] = feedback;
@@ -1130,7 +1131,8 @@ int main(void) {
   };
 
   //  producer_pool = audio_new_producer_pool(&producer_format, 8, 48); // todo correct size
-  producer_pool = audio_new_producer_pool(&producer_format, BUFFER_NUM, 50); // todo correct size
+  producer_pool = audio_new_producer_pool(&producer_format, BUFFER_NUM,
+					  AUDIO_MAX_PACKET_SIZE(AUDIO_FREQ_MAX) / 4);
   bool __unused ok;
   struct audio_i2s_config config = {
     .data_pin = PICO_AUDIO_I2S_DATA_PIN,
@@ -1147,7 +1149,10 @@ int main(void) {
 
   myInit();
 
-  ok = audio_i2s_connect_extra(producer_pool, false, 2, 96, NULL);
+  // It is not clear what is meant by the number "96" but I fixed it as well as producer_pool.
+  // ok = audio_i2s_connect_extra(producer_pool, false, 2, 96, NULL);
+  ok = audio_i2s_connect_extra(producer_pool, false, 2,
+  			       AUDIO_MAX_PACKET_SIZE(AUDIO_FREQ_MAX) / 2, NULL);
   assert(ok);
 
   usb_sound_card_init();
@@ -1166,6 +1171,7 @@ int main(void) {
       lcdOn();
     }
 #if DEBUG_FEEDBACK
+    numFreeBuf = countFreeBuffers();
     drawResponse();
     sendImage();
     lcdOn();
