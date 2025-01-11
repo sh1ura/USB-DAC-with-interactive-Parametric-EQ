@@ -25,7 +25,7 @@
 static struct {
   uint32_t freq;
   int16_t volume;
-  int16_t vol_mul;
+  int32_t vol_mul;
   bool mute;
 } audio_state = {
   .freq = 48000,
@@ -39,7 +39,7 @@ int numFreeBuf;
 #endif
 
 // RP2040 : EQ_CH <= 4   RP2350 : EQ_CH <= 8
-#define EQ_CH 8 // channnel of parametric equalizer
+#define EQ_CH 4 // channnel of parametric equalizer
 
 #if EQ_CH == 2
 const int defaultFreq[] = {100, 1000};
@@ -314,7 +314,8 @@ static void drawAxis(void) {
   drawText(LCD_WIDTH-61, LCD_HEIGHT - 15, mode == MODE_SETTING ? "RESET" : " DOWN", WHITE);
 
 #if DEBUG_FEEDBACK
-  sprintf(str, "freeBuf=%d", numFreeBuf);
+  sprintf(str, "%d", audio_state.volume);
+  //  sprintf(str, "freeBuf=%d", numFreeBuf);
   drawText(120, 1, str, RED);
 #else
   if(mode < EQ_CH * 3) {
@@ -747,8 +748,8 @@ static int countFreeBuffers(void) {
   return i;
 }
 
-#define FADE_SPEED1 100
-#define FADE_SPEED2 40
+#define FADE_SPEED1 200
+#define FADE_SPEED2 80
 
 static void _as_audio_packet(struct usb_endpoint *ep) {
   static int32_t vol2 = 0;
@@ -756,14 +757,14 @@ static void _as_audio_packet(struct usb_endpoint *ep) {
   struct usb_buffer *usb_buffer = usb_current_out_packet_buffer(ep);
   struct audio_buffer *audio_buffer = take_audio_buffer(producer_pool, true);
   audio_buffer->sample_count = usb_buffer->data_len / 4;
-  uint16_t vol_mul = audio_state.vol_mul;
+  int32_t vol_mul = audio_state.vol_mul;
 
   int16_t *out = (int16_t *) audio_buffer->buffer->bytes;
   int16_t *in = (int16_t *) usb_buffer->data;
 
   // add mute function with gentle fading
   if(audio_state.mute) {
-    vol_mul = 1;
+    vol_mul = 0;
   }
     if(vol2 != vol_mul) {
     int32_t diff = (vol_mul - vol2) / FADE_SPEED1;
@@ -775,8 +776,8 @@ static void _as_audio_packet(struct usb_endpoint *ep) {
   }
 
   for (int i = 0; i < audio_buffer->sample_count * 2; i+=2) {
-    out[i  ] = (filterR(in[i  ]) * vol2) >> 15u;
-    out[i+1] = (filterL(in[i+1]) * vol2) >> 15u;
+    out[i  ] = (filterR(in[i  ]) * vol2) >> 16u;
+    out[i+1] = (filterL(in[i+1]) * vol2) >> 16u;
   }
 
   give_audio_buffer(producer_pool, audio_buffer);
@@ -847,30 +848,11 @@ static bool do_get_current(struct usb_setup_packet *setup) {
   return false;
 }
 
-// todo this seemed like aood guess, but is not correct
-uint16_t db_to_vol[91] = {
-  0x0001, 0x0001, 0x0001, 0x0001, 0x0001, 0x0001, 0x0002, 0x0002,
-  0x0002, 0x0002, 0x0003, 0x0003, 0x0004, 0x0004, 0x0005, 0x0005,
-  0x0006, 0x0007, 0x0008, 0x0009, 0x000a, 0x000b, 0x000d, 0x000e,
-  0x0010, 0x0012, 0x0014, 0x0017, 0x001a, 0x001d, 0x0020, 0x0024,
-  0x0029, 0x002e, 0x0033, 0x003a, 0x0041, 0x0049, 0x0052, 0x005c,
-  0x0067, 0x0074, 0x0082, 0x0092, 0x00a4, 0x00b8, 0x00ce, 0x00e7,
-  0x0104, 0x0124, 0x0147, 0x016f, 0x019c, 0x01ce, 0x0207, 0x0246,
-  0x028d, 0x02dd, 0x0337, 0x039b, 0x040c, 0x048a, 0x0518, 0x05b7,
-  0x066a, 0x0732, 0x0813, 0x090f, 0x0a2a, 0x0b68, 0x0ccc, 0x0e5c,
-  0x101d, 0x1214, 0x1449, 0x16c3, 0x198a, 0x1ca7, 0x2026, 0x2413,
-  0x287a, 0x2d6a, 0x32f5, 0x392c, 0x4026, 0x47fa, 0x50c3, 0x5a9d,
-  0x65ac, 0x7214, 0x7fff
-};
-
-// actually windows doesn't seem to like this in the middle, so set top range to 0db
-#define CENTER_VOLUME_INDEX 91
-
 #define ENCODE_DB(x) ((uint16_t)(int16_t)((x)*256))
 
-#define MIN_VOLUME           ENCODE_DB(-CENTER_VOLUME_INDEX)
+#define MIN_VOLUME           ENCODE_DB(-100.0)
 #define DEFAULT_VOLUME       ENCODE_DB(0)
-#define MAX_VOLUME           ENCODE_DB(count_of(db_to_vol)-CENTER_VOLUME_INDEX)
+#define MAX_VOLUME           ENCODE_DB(0)
 #define VOLUME_RESOLUTION    ENCODE_DB(1)
 
 static bool do_get_minimum(struct usb_setup_packet *setup) {
@@ -934,13 +916,14 @@ static void _audio_reconfigure() {
 }
 
 static void audio_set_volume(int16_t volume) {
+  if(volume > MAX_VOLUME) { // comm. error
+    return;
+  }
   audio_state.volume = volume;
-  // todo interpolate
-  volume += CENTER_VOLUME_INDEX * 256;
-  if (volume < 0) volume = 0;
-  if (volume >= count_of(db_to_vol) * 256) volume = count_of(db_to_vol) * 256 - 1;
-  audio_state.vol_mul = db_to_vol[((uint16_t)volume) >> 8u];
-  //    printf("VOL MUL %04x\n", audio_state.vol_mul);
+  double vol = exp(volume / 2560.0); // 16q => dB => linear
+  if(vol > 1.0) vol = 1.0;
+  if(vol < 0.0) vol = 0.0;
+  audio_state.vol_mul = (int32_t)(vol * (1 << 16));
 }
 
 static void audio_cmd_packet(struct usb_endpoint *ep) {
