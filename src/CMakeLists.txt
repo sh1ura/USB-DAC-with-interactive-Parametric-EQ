@@ -33,6 +33,9 @@ add_executable(sound-eq
 target_compile_definitions(sound-eq PRIVATE
     AUDIO_FREQ_MAX=48000
 
+    PICO_AUDIO_I2S_DATA_PIN=26
+    PICO_AUDIO_I2S_CLOCK_PIN_BASE=27
+
     # ours are zero based, so say so
     PICO_USBDEV_USE_ZERO_BASED_INTERFACES=1
 
