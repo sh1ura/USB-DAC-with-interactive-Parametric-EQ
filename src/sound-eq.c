@@ -39,14 +39,14 @@ int numFreeBuf;
 #endif
 
 // RP2040 : EQ_CH <= 4   RP2350 : EQ_CH <= 8
-#define EQ_CH 4 // channnel of parametric equalizer
+#define EQ_CH 8 // channnel of parametric equalizer
 
-#if EQ_CH == 4
-const int defaultFreq[] = {100, 300, 1000, 3000};
+#if EQ_CH == 2
+const int defaultFreq[] = {100, 1000};
 #elif EQ_CH == 3
 const int defaultFreq[] = {100, 500, 3000};
-#elif EQ_CH == 2
-const int defaultFreq[] = {100, 1000};
+#elif EQ_CH == 4
+const int defaultFreq[] = {100, 300, 1000, 3000};
 #else
 const int defaultFreq[] = {50, 100, 200, 500, 1000, 2000, 5000, 10000};
 #endif
@@ -163,11 +163,6 @@ void load_setting_from_flash(void) {
   }
   memcpy(&setting, flash_target_contents + 1, sizeof(Settings));
 }
-
-#undef PICO_AUDIO_I2S_DATA_PIN
-#define PICO_AUDIO_I2S_DATA_PIN 26
-#undef PICO_AUDIO_I2S_CLOCK_PIN_BASE
-#define PICO_AUDIO_I2S_CLOCK_PIN_BASE 27
 
 #define LCD_KEY_LT 2
 #define LCD_KEY_LB 17
@@ -757,8 +752,7 @@ static int countFreeBuffers(void) {
 
 static void _as_audio_packet(struct usb_endpoint *ep) {
   static int32_t vol2 = 0;
-  static int cnt = 0;
-  
+
   struct usb_buffer *usb_buffer = usb_current_out_packet_buffer(ep);
   struct audio_buffer *audio_buffer = take_audio_buffer(producer_pool, true);
   audio_buffer->sample_count = usb_buffer->data_len / 4;
@@ -771,7 +765,7 @@ static void _as_audio_packet(struct usb_endpoint *ep) {
   if(audio_state.mute) {
     vol_mul = 1;
   }
-  if(vol2 != vol_mul) {
+    if(vol2 != vol_mul) {
     int32_t diff = (vol_mul - vol2) / FADE_SPEED1;
     if      (diff >  FADE_SPEED2) diff =  FADE_SPEED2;
     else if (diff < -FADE_SPEED2) diff = -FADE_SPEED2;
@@ -779,7 +773,7 @@ static void _as_audio_packet(struct usb_endpoint *ep) {
     if     (vol2 < vol_mul) vol2++;
     else if(vol2 > vol_mul) vol2--;
   }
-  
+
   for (int i = 0; i < audio_buffer->sample_count * 2; i+=2) {
     out[i  ] = (filterR(in[i  ]) * vol2) >> 15u;
     out[i+1] = (filterL(in[i+1]) * vol2) >> 15u;
