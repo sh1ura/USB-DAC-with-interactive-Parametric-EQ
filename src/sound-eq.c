@@ -39,7 +39,7 @@ int numFreeBuf;
 #endif
 
 // RP2040 : EQ_CH <= 4   RP2350 : EQ_CH <= 8
-#define EQ_CH 4 // channnel of parametric equalizer
+#define EQ_CH 8 // channnel of parametric equalizer
 
 #if EQ_CH == 2
 const int defaultFreq[] = {100, 1000};
@@ -67,7 +67,7 @@ typedef struct {
 
 Settings setting;
 
-#define SHIFT_C 20 // fixed point for coeffs
+#define SHIFT_C 24 // fixed point for coeffs
 #define SHIFT_V 16 // fixed point for value
 
 BiQuadCoeffs coeff[EQ_CH];
@@ -93,13 +93,13 @@ static void calcBinCoeffs(void) {
   gainBC = (int64_t) ((double)(1 << SHIFT_V) / pow(10, setting.totalGain/20));
 }
 
-static int32_t filterL(int64_t in) {
+static int32_t filterL(int32_t in32) {
   static int64_t in1[EQ_CH], in2[EQ_CH], out1[EQ_CH], out2[EQ_CH], out;
+  int64_t in = ((int64_t)in32) << SHIFT_V;
     
   if(!sw) {
-    return in;
+    return in32;
   }
-  in <<= SHIFT_V;
   for(int i = 0; i < EQ_CH; i++) {
     out = bc[i].b0 * in + bc[i].b1 * in1[i] + bc[i].b2 * in2[i] - bc[i].a1 * out1[i] - bc[i].a2 * out2[i];
     out >>= SHIFT_C;
@@ -110,13 +110,13 @@ static int32_t filterL(int64_t in) {
   return out / gainBC;
 }
 
-static int32_t filterR(int64_t in) {
+static int32_t filterR(int32_t in32) {
   static int64_t in1[EQ_CH], in2[EQ_CH], out1[EQ_CH], out2[EQ_CH], out;
+  int64_t in = ((int64_t)in32) << SHIFT_V;
     
   if(!sw) {
-    return in;
+    return in32;
   }
-  in <<= SHIFT_V;
   for(int i = 0; i < EQ_CH; i++) {
     out = bc[i].b0 * in + bc[i].b1 * in1[i] + bc[i].b2 * in2[i] - bc[i].a1 * out1[i] - bc[i].a2 * out2[i];
     out >>= SHIFT_C;
@@ -757,11 +757,10 @@ static void _as_audio_packet(struct usb_endpoint *ep) {
   struct usb_buffer *usb_buffer = usb_current_out_packet_buffer(ep);
   struct audio_buffer *audio_buffer = take_audio_buffer(producer_pool, true);
   audio_buffer->sample_count = usb_buffer->data_len / 4;
-  int32_t vol_mul = audio_state.vol_mul;
-
-  int16_t *out = (int16_t *) audio_buffer->buffer->bytes;
   int16_t *in = (int16_t *) usb_buffer->data;
+  int16_t *out = (int16_t *) audio_buffer->buffer->bytes;
 
+  int32_t vol_mul = audio_state.vol_mul;
   // add mute function with gentle fading
   if(audio_state.mute) {
     vol_mul = 0;
@@ -776,8 +775,8 @@ static void _as_audio_packet(struct usb_endpoint *ep) {
   }
 
   for (int i = 0; i < audio_buffer->sample_count * 2; i+=2) {
-    out[i  ] = (filterR(in[i  ]) * vol2) >> 16u;
-    out[i+1] = (filterL(in[i+1]) * vol2) >> 16u;
+    out[i+1] = (filterL(in[i  ]) * vol2) >> 15u;
+    out[i  ] = (filterR(in[i+1]) * vol2) >> 15u;
   }
 
   give_audio_buffer(producer_pool, audio_buffer);
@@ -850,7 +849,7 @@ static bool do_get_current(struct usb_setup_packet *setup) {
 
 #define ENCODE_DB(x) ((uint16_t)(int16_t)((x)*256))
 
-#define MIN_VOLUME           ENCODE_DB(-100.0)
+#define MIN_VOLUME           ENCODE_DB(-80.0)
 #define DEFAULT_VOLUME       ENCODE_DB(0)
 #define MAX_VOLUME           ENCODE_DB(0)
 #define VOLUME_RESOLUTION    ENCODE_DB(1)
@@ -920,10 +919,9 @@ static void audio_set_volume(int16_t volume) {
     return;
   }
   audio_state.volume = volume;
-  double vol = exp(volume / 2560.0); // 16q => dB => linear
+  double vol = pow(10, volume / (256 * 20.0)); // 16q => dB => linear
   if(vol > 1.0) vol = 1.0;
-  if(vol < 0.0) vol = 0.0;
-  audio_state.vol_mul = (int32_t)(vol * (1 << 16));
+  audio_state.vol_mul = (int32_t)(vol * 0x7fff);
 }
 
 static void audio_cmd_packet(struct usb_endpoint *ep) {
