@@ -38,8 +38,13 @@ static struct {
 int numFreeBuf;
 #endif
 
+// channnel of parametric equalizer
 // RP2040 : EQ_CH <= 4   RP2350 : EQ_CH <= 8
-#define EQ_CH 8 // channnel of parametric equalizer
+#if PICO_RP2350
+#define EQ_CH 8
+#else
+#define EQ_CH 4
+#endif
 
 #if EQ_CH == 2
 const int defaultFreq[] = {100, 1000};
@@ -51,10 +56,10 @@ const int defaultFreq[] = {100, 300, 1000, 3000};
 const int defaultFreq[] = {50, 100, 200, 500, 1000, 2000, 5000, 10000};
 #endif
   
-#define DEFAULT_BW 3
+#define DEFAULT_BW 1
 #define DEFAULT_GAIN 0
-#define GAIN_STEP 0.2
-#define BW_STEP 1.18920711 // 1/4 octave
+#define GAIN_STEP 0.1
+#define BW_STEP .01
 
 int currentFreq = 48000;
 
@@ -126,6 +131,7 @@ static int32_t filterR(int32_t in32) {
   }
   return out / gainBC;
 }
+
 
 #include <hardware/flash.h>
 #include <hardware/watchdog.h>
@@ -333,7 +339,7 @@ static void drawAxis(void) {
 	sprintf(str, "%dHz", (int)(setting.freqCenter[ch] + 0.001));
       }
       else {
-	sprintf(str, "%.1fkHz", setting.freqCenter[ch] / 1000 + 0.001);
+	sprintf(str, "%.2fkHz", setting.freqCenter[ch] / 1000 + 0.001);
       }
       drawText(LCD_WIDTH/2-20, 1, str, CYAN);
       break;
@@ -387,19 +393,25 @@ double freqStep(double f) {
   if(f < 100) {
     return 1.0;
   }
-  else if(f < 300) {
-    return 10.0;
+  else if(f < 200) {
+    return 2.0;
+  }
+  else if(f < 500) {
+    return 5.0;
   }
   else if(f < 1000) {
+    return 10.0;
+  }
+  else if(f < 2000) {
     return 20.0;
   }
-  else if(f < 3000) {
-    return 100.0;
+  else if(f < 5000) {
+    return 50.0;
   }
   else if(f < 10000) {
-    return 200.0;
+    return 100.0;
   }
-  return 1000.0;
+  return 200.0;
 }
 
 static void sense(void) {
@@ -463,7 +475,7 @@ static void sense(void) {
 	setting.gain[ch] += GAIN_STEP;
 	break;
       case  2:
-	setting.bandWidth[ch] *= BW_STEP;
+	setting.bandWidth[ch] += BW_STEP;
 	break;
       }
     }
@@ -486,7 +498,7 @@ static void sense(void) {
 	setting.gain[ch] -= GAIN_STEP;
 	break;
       case 2:
-	setting.bandWidth[ch] /= BW_STEP;
+	setting.bandWidth[ch] -= BW_STEP;
 	break;
       }
     }
