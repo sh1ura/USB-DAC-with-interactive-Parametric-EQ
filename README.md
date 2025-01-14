@@ -10,7 +10,7 @@ Raspberry-Pi Pico based USB DAC with parametric equalizer (PEQ)
 ## Ver.2 : ready for room EQ compensation
   
 ![peq1](https://github.com/user-attachments/assets/61e4f219-03b9-48d3-873b-3ad1a90c01a4)
-Green line shows the center frequency of EQ2. The frequency (250Hz) is shown on top as well.
+Green line shows the center frequency of EQ4. The frequency (2.8kHz) is shown on top as well.
 
 * Fully controllable IIR (BiQuad) filters
 * Precise tuning is possible for all parameters
@@ -25,7 +25,7 @@ You can save or reset parameters here.
 
 ## Necessary Parts
 
-* Raspberry Pi Pico (RP2040), Pico2 (RP2350) or compatible board. RP2350 is recommended.
+* Raspberry Pi Pico (RP2040), Pico2 (RP2350) or compatible board. **RP2350 is recommended.**
 * [Waveshare Pico LCD 2](https://www.waveshare.com/wiki/Pico-LCD-2) (2inch LCD Display Module)
 * [Waveshare Pico-Audio](https://www.waveshare.com/wiki/Pico-Audio) (I used Rev.1 board with Burr-Brown PCM5101A)
 
@@ -33,7 +33,7 @@ You can save or reset parameters here.
 
 1. Stack three boards
 2. Connect USB to your PC while press and hold BOOTSEL button
-3. Drag and drop soud-eq.uf2 file to the RPI-RP2 (or RP2350) icon
+3. Drag and drop soud-eq-RP????-?ch.uf2 file to the RPI-RP2 (or RP2350) icon
 
 Then this board will be recognized as "Pico Sound Card with EQ"
 
@@ -52,7 +52,7 @@ Please see the movies at https://youtu.be/eDUhabNW9hQ for operation.
 
 ## Limitations and tips
 
-* When the settings are saved to flash memory, the sound card stops (the board reboots)
+* When the settings are saved to flash memory, the sound card stops (the board reboots immediately)
 * High gain (high peak of EQ or high total gain) sometimes causes noise (overflow of 16bit values)
 * RP2040 only : If sound is playing back, the UI slows down (If sound stops, UI is sufficiently responsive. If you use RP2350, the UI is always responsive)
 * If you use VCC-GND YD-RP2040 board (compatibles of Raspberry-Pi Pico), bridge pin 39 and 40 (Vin and Vout) because Waveshare boards are powered from Pin39 (but pin 39 of YD-RP2040 can not supply power)
@@ -71,16 +71,19 @@ Please see the movies at https://youtu.be/eDUhabNW9hQ for operation.
 
 ## Example of room EQ compensation using [REW](https://www.roomeqwizard.com/)
 
+See [instructables](https://www.instructables.com/Room-Acoustic-Correction-by-DIY-Parametric-Equaliz/) as well.
+
 ### Calculating parameter
-![eq](https://github.com/user-attachments/assets/36b21219-ed9d-4f15-886f-ccbe9e356994)
-* Brown curve shows the measured frequency response without EQ
-* Blue curve shows the target frequency response
-* Red curve shows simulated (predicted) frequency response if calculated EQ is applied
-* "EQ filters" window shows parameters of calculated EQ
+
+![eq](https://github.com/user-attachments/assets/7182662d-f9c9-4915-ace3-a1c41c1dbf59)
+* Thin blue curve shows the measured frequency response without EQ
+* Thick curve shows simulated (predicted) frequency response if calculated EQ is applied
+* "EQ filters" window shows parameters of optimized EQ
 
 ### Result (measured frequency response with and without equalizer)
-![result](https://github.com/user-attachments/assets/5c1578c2-36f0-4bf9-8b50-9b4f43e6ff2d)
-* Red curve shows the measured frequency response without EQ
-* Green curve shows measured frequency response using this USB-DAC with EQ
+
+![result](https://github.com/user-attachments/assets/9b4c5f7a-52e2-453d-8e64-cc9ef5ecaf1d)
+* Blue curve shows the measured frequency response without EQ
+* Red curve shows measured frequency response using this USB-DAC with EQ
 
 Please see that the measured curve matches predicted curve very well.
