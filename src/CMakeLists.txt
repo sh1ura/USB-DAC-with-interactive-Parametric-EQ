@@ -15,14 +15,14 @@ pico_sdk_init()
 
 add_subdirectory(./lib/Config)
 add_subdirectory(./lib/LCD)
-add_subdirectory(./lib/lvgl)
+# add_subdirectory(./lib/lvgl)
 # add_subdirectory(./examples)
 
-include_directories(./examples)
+# include_directories(./examples)
 include_directories(./lib/Config)
 include_directories(./lib/LCD)
-include_directories(./lib/lvgl)
-include_directories(./examples/inc)
+# include_directories(./lib/lvgl)
+# include_directories(./examples/inc)
 
 add_executable(sound-eq
 	src/sound-eq.c
@@ -56,7 +56,7 @@ target_link_libraries(sound-eq
 	pico_stdlib usb_device
 	pico_audio_i2s pico_multicore
 	LCD
-	LVGL
+#	LVGL
 	Config
 	pico_stdlib
 	hardware_spi
