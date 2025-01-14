@@ -2,6 +2,7 @@
 
 ## You need to build
 
+* install arm compiler (arm-none-eabi-gcc)
 * install SDK of Raspberry Pi Pico (pico-sdk, pico-extras, pico-examples, pico-playground)
     - set path to pico-sdk by `export PICO_SDK_PATH=<path to pico-sdk>`
 * copy pico_extras_import.cmake and pico_sdk_import.cmake at base folder
