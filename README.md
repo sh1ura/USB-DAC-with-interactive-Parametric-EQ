@@ -75,15 +75,17 @@ See [instructables](https://www.instructables.com/Room-Acoustic-Correction-by-DI
 
 ### Calculating parameter
 
-![eq](https://github.com/user-attachments/assets/7182662d-f9c9-4915-ace3-a1c41c1dbf59)
-* Thin blue curve shows the measured frequency response without EQ
-* Thick curve shows simulated (predicted) frequency response if calculated EQ is applied
+![eq](https://github.com/user-attachments/assets/909a8752-4013-4b3d-a27e-61ba1f8f9142)
+
+* Blue curve shows the measured frequency response without EQ
+* Black curve shows the target response
+* Red curve shows simulated (predicted) frequency response if calculated EQ is applied
 * "EQ filters" window shows parameters of optimized EQ
 
 ### Result (measured frequency response with and without equalizer)
 
-![result](https://github.com/user-attachments/assets/9b4c5f7a-52e2-453d-8e64-cc9ef5ecaf1d)
+![result](https://github.com/user-attachments/assets/41162468-2b91-46af-a6e0-c8c9aff992a6)
 * Blue curve shows the measured frequency response without EQ
-* Red curve shows measured frequency response using this USB-DAC with EQ
+* Red curve shows measured frequency response compensated by this USB-DAC with EQ
 
 Please see that the measured curve matches predicted curve very well.
