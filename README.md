@@ -75,7 +75,7 @@ See [instructables](https://www.instructables.com/Room-Acoustic-Correction-by-DI
 
 ### Calculating parameter
 
-![eq](https://github.com/user-attachments/assets/909a8752-4013-4b3d-a27e-61ba1f8f9142)
+![eq](https://github.com/user-attachments/assets/22f8555b-bc11-4afb-b21e-cdbd09bfa8b6)
 
 * Blue curve shows the measured frequency response without EQ
 * Black curve shows the target response
@@ -84,7 +84,8 @@ See [instructables](https://www.instructables.com/Room-Acoustic-Correction-by-DI
 
 ### Result (measured frequency response with and without equalizer)
 
-![result](https://github.com/user-attachments/assets/41162468-2b91-46af-a6e0-c8c9aff992a6)
+![result](https://github.com/user-attachments/assets/5dec26f6-4f2a-462e-95ac-48f80f886839)
+
 * Blue curve shows the measured frequency response without EQ
 * Red curve shows measured frequency response compensated by this USB-DAC with EQ
 
