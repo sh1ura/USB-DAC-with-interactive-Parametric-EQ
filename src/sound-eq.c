@@ -31,12 +31,8 @@ static struct {
   .freq = 48000,
 };
 
-#define DEBUG_FEEDBACK 0 // for debuggin USB audio rate feedback
-
-#define BUFFER_NUM 8 // buffer for I2S (corresponds to msec)
-#if DEBUG_FEEDBACK
+#define BUFFER_NUM 12 // buffer for I2S (corresponds to msec)
 int numFreeBuf;
-#endif
 
 // channnel of parametric equalizer
 // RP2040 : EQ_CH <= 4   RP2350 : EQ_CH <= 8
@@ -84,7 +80,7 @@ int64_t gainBC = (1 << SHIFT_V);
 
 volatile bool sw = true; // switch of filter on/off
 
-static void drawResponse(void);
+static void drawScreen(void);
 
 static void calcBinCoeffs(void) {
   for(int i = 0; i < EQ_CH; i++) {
@@ -227,7 +223,7 @@ void myInit(void) {
   gpio_pull_up(LCD_KEY_RB);
 
   calcBinCoeffs();
-  drawResponse();
+  drawScreen();
   sendImage();
   lcdOn();
 }
@@ -260,10 +256,6 @@ char *modeStr[] = {
 };
 
 static void drawAxis(void) {
-  char str[100];
-
-  clearImage(BLACK);
-
   for(int y = 20; y < LCD_HEIGHT - 20; y++){
     for(int x = 0; x < LCD_WIDTH; x++){
       image[y][x] = 0xFFFF;
@@ -305,7 +297,33 @@ static void drawAxis(void) {
   drawText(2, GAIN_TO_Y( 10) - 7, " 10", BLACK);
   drawText(2, GAIN_TO_Y(-10) - 7, "-10", BLACK);
   drawText(2, GAIN_TO_Y(-20) - 7, "-20", BLACK);
-  
+}
+
+static void drawResponse(void) {
+  double g;
+  Complex r;
+
+  drawAxis();
+
+  for(int x = MARGIN_LEFT; x < LCD_WIDTH; x++) {
+    double freq = X_TO_FREQ(x);
+
+    r.re = 1;
+    r.im = 0;
+    for(int i = 0; i < EQ_CH; i++) {
+      r = mul(r, calcResponse(coeff[i], freq, (double)currentFreq));
+    }
+    g = 10 * log10(r.re * r.re + r.im * r.im);
+    g += setting.totalGain;
+    int y = GAIN_TO_Y(g) + 0.5;
+      
+    drawPoint(x, y, sw ? RED : BLUE);
+  }
+}
+
+static void drawUI(void) {
+  char str[100];
+
   drawText(0, 1, "EQ", WHITE);
   if(sw) {
     drawText(12 * 3, 1, "ON", RED);
@@ -319,11 +337,6 @@ static void drawAxis(void) {
   drawText(LCD_WIDTH-61, 1, mode == MODE_SETTING ? " SAVE" : "   UP", WHITE);
   drawText(LCD_WIDTH-61, LCD_HEIGHT - 15, mode == MODE_SETTING ? "RESET" : " DOWN", WHITE);
 
-#if DEBUG_FEEDBACK
-  sprintf(str, "%d", audio_state.volume);
-  //  sprintf(str, "freeBuf=%d", numFreeBuf);
-  drawText(120, 1, str, RED);
-#else
   if(mode < EQ_CH * 3) {
     char p[20];
     strcpy(p, modeStr[mode % 3]);
@@ -364,29 +377,63 @@ static void drawAxis(void) {
       drawText(LCD_WIDTH/2-20, 1, str, WHITE);
     }
   }
-#endif
 }  
 
-static void drawResponse(void) {
-  double g;
-  Complex r;
+#define LINESPACE 18
+#define TEXT_X(x) ((x) * 12 + 6)
+#define TEXT_Y(y) ((y) * LINESPACE + 4)
 
-  drawAxis();
-  
-  for(int x = MARGIN_LEFT; x < LCD_WIDTH; x++) {
-    double freq = X_TO_FREQ(x);
+static void dispValues(void) {
+  char str[100];
 
-    r.re = 1;
-    r.im = 0;
-    for(int i = 0; i < EQ_CH; i++) {
-      r = mul(r, calcResponse(coeff[i], freq, (double)currentFreq));
+  for(int y = 20; y < LCD_HEIGHT - 20; y++){
+    for(int x = 0; x < LCD_WIDTH; x++){
+      image[y][x] = 0xFFFF;
     }
-    g = 10 * log10(r.re * r.re + r.im * r.im);
-    g += setting.totalGain;
-    int y = GAIN_TO_Y(g) + 0.5;
-      
-    drawPoint(x, y, sw ? RED : BLUE);
   }
+
+  for(int ch = 0; ch < EQ_CH; ch++) {
+    if(setting.freqCenter[ch] < 1000.0) {
+      sprintf(str, "%6dHz", (int)(setting.freqCenter[ch] + 0.001));
+    }
+    else {
+      sprintf(str, "%5.2fkHz", setting.freqCenter[ch] / 1000 + 0.001);
+    }
+    drawText(TEXT_X(0), TEXT_Y(ch + 1), str, BLACK);
+
+    sprintf(str, "%5.1fdB", setting.gain[ch] + 0.001); 
+    drawText(TEXT_X(10), TEXT_Y(ch + 1), str, BLACK);
+
+    sprintf(str, "%4.2foct", setting.bandWidth[ch] + 0.001);
+    drawText(TEXT_X(18), TEXT_Y(ch + 1), str, BLACK);
+  }
+  sprintf(str, "%Total Gain : %4.1fdB", setting.totalGain + 0.001);
+  drawText(TEXT_X(2), TEXT_Y(EQ_CH + 1), str, BLACK);
+  sprintf(str, "Volume %d ", audio_state.vol_mul);
+  drawText(TEXT_X(2), TEXT_Y(EQ_CH + 2), str, BLACK);
+  sprintf(str, "Buffer                               ");
+  for(int i = 0; i < BUFFER_NUM; i++) {
+    if(i < BUFFER_NUM - numFreeBuf) {
+      str[i + 8] = 'O';
+    }
+    else {
+      str[i + 8] = '-';
+    }
+  }
+  drawText(TEXT_X(2), TEXT_Y(EQ_CH + 3), str, BLACK);
+}
+
+static void drawScreen(void) {
+  clearImage(BLACK);
+
+  if(mode == MODE_SETTING) {
+    dispValues();
+  }
+  else {
+    drawResponse();
+  }
+  drawUI();
+  
 }
 
 double freqStep(double f) {
@@ -504,7 +551,7 @@ static void sense(void) {
     }
   }
   calcBinCoeffs();
-  drawResponse();
+  drawScreen();
   sendImage();
   lcdOn();
 }
@@ -1153,16 +1200,12 @@ int main(void) {
       currentFreq = audio_state.freq;
       calcBinCoeffs();
       mode = MODE_SETTING;
-      drawResponse();
-      sendImage();
       lcdOn();
     }
-#if DEBUG_FEEDBACK
-    numFreeBuf = countFreeBuffers();
-    drawResponse();
-    sendImage();
-    lcdOn();
-#endif
-    //        __wfi();
+    if(mode == MODE_SETTING) {
+      numFreeBuf = countFreeBuffers();
+      drawScreen();
+      sendImage();
+    }
   }
 }
