@@ -414,10 +414,10 @@ static void dispValues(void) {
   sprintf(str, "Buffer                               ");
   for(int i = 0; i < BUFFER_NUM; i++) {
     if(i < BUFFER_NUM - numFreeBuf) {
-      str[i + 8] = 'O';
+      str[i + 7] = 'O';
     }
     else {
-      str[i + 8] = '-';
+      str[i + 7] = '-';
     }
   }
   drawText(TEXT_X(2), TEXT_Y(EQ_CH + 3), str, BLACK);
