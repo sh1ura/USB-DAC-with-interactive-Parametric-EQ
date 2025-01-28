@@ -19,7 +19,7 @@ Green line shows the center frequency of EQ4. The frequency (2.8kHz) is shown on
 * Rapid value change by press and hold the button
 * Current sample frequency is now displayed
   
-![settings](https://github.com/user-attachments/assets/7af4e69d-3ae2-465e-8036-41d5e4469978)
+![settings](https://github.com/user-attachments/assets/a3da607c-3932-472d-88ca-f0312c5be137)
 Sample frequency is shown on top. If the frequency changes, LCD is automatically turned on and shows it.
 Parameters of the equalizer are summarized. You can save or reset parameters here.
 The buffer occupancy is shown in real-time.
