@@ -74,8 +74,10 @@ Settings setting;
 BiQuadCoeffs coeff[EQ_CH];
 typedef struct {
   int64_t a1, a2, b0, b1, b2; // filter fixed point coeffs
-} BinCoeffs;
-BinCoeffs bc[EQ_CH]; // binary coefficient
+  int64_t in1, in2, out1, out2; // filter state (delay lines)
+} BiquadState;
+BiquadState biquadsL[EQ_CH];
+BiquadState biquadsR[EQ_CH];
 int64_t gainBC = (1 << SHIFT_V);
 
 volatile bool sw = true; // switch of filter on/off
@@ -85,47 +87,52 @@ static void drawScreen(void);
 static void calcBinCoeffs(void) {
   for(int i = 0; i < EQ_CH; i++) {
     coeff[i] = calcCoeffs((double)currentFreq, setting.freqCenter[i] , setting.bandWidth[i], setting.gain[i]);
-    bc[i].a1 = coeff[i].a1 * (1 << SHIFT_C) + 0.5;
-    bc[i].a2 = coeff[i].a2 * (1 << SHIFT_C) + 0.5;
-    bc[i].b0 = coeff[i].b0 * (1 << SHIFT_C) + 0.5;
-    bc[i].b1 = coeff[i].b1 * (1 << SHIFT_C) + 0.5;
-    bc[i].b2 = coeff[i].b2 * (1 << SHIFT_C) + 0.5;
+    int64_t a1 = coeff[i].a1 * (1 << SHIFT_C) + 0.5;
+    int64_t a2 = coeff[i].a2 * (1 << SHIFT_C) + 0.5;
+    int64_t b0 = coeff[i].b0 * (1 << SHIFT_C) + 0.5;
+    int64_t b1 = coeff[i].b1 * (1 << SHIFT_C) + 0.5;
+    int64_t b2 = coeff[i].b2 * (1 << SHIFT_C) + 0.5;
+
+    biquadsL[i].a1 = a1; biquadsL[i].a2 = a2; biquadsL[i].b0 = b0; biquadsL[i].b1 = b1; biquadsL[i].b2 = b2;
+    biquadsR[i].a1 = a1; biquadsR[i].a2 = a2; biquadsR[i].b0 = b0; biquadsR[i].b1 = b1; biquadsR[i].b2 = b2;
   }
   gainBC = (int64_t) ((double)(1 << SHIFT_V) / pow(10, setting.totalGain/20));
 }
 
-static int32_t filterL(int32_t in32) {
-  static int64_t in1[EQ_CH], in2[EQ_CH], out1[EQ_CH], out2[EQ_CH], out;
-  int64_t in = ((int64_t)in32) << SHIFT_V;
-    
+static void filterStereo(int32_t in_l, int32_t in_r, int32_t *out_l, int32_t *out_r) {
   if(!sw) {
-    return in32;
+    *out_l = in_l;
+    *out_r = in_r;
+    return;
   }
+  int64_t l = ((int64_t)in_l) << SHIFT_V;
+  int64_t r = ((int64_t)in_r) << SHIFT_V;
+  BiquadState *fl = biquadsL;
+  BiquadState *fr = biquadsR;
   for(int i = 0; i < EQ_CH; i++) {
-    out = bc[i].b0 * in + bc[i].b1 * in1[i] + bc[i].b2 * in2[i] - bc[i].a1 * out1[i] - bc[i].a2 * out2[i];
-    out >>= SHIFT_C;
-    in2[i] = in1[i];    in1[i] = in;
-    out2[i] = out1[i];  out1[i] = out;
-    in = out;
-  }
-  return out / gainBC;
-}
+    int64_t b0 = fl->b0;
+    int64_t b1 = fl->b1;
+    int64_t b2 = fl->b2;
+    int64_t a1 = fl->a1;
+    int64_t a2 = fl->a2;
 
-static int32_t filterR(int32_t in32) {
-  static int64_t in1[EQ_CH], in2[EQ_CH], out1[EQ_CH], out2[EQ_CH], out;
-  int64_t in = ((int64_t)in32) << SHIFT_V;
-    
-  if(!sw) {
-    return in32;
+    int64_t out_l_tmp = b0 * l + b1 * fl->in1 + b2 * fl->in2 - a1 * fl->out1 - a2 * fl->out2;
+    out_l_tmp >>= SHIFT_C;
+    fl->in2 = fl->in1;   fl->in1 = l;
+    fl->out2 = fl->out1; fl->out1 = out_l_tmp;
+    l = out_l_tmp;
+
+    int64_t out_r_tmp = b0 * r + b1 * fr->in1 + b2 * fr->in2 - a1 * fr->out1 - a2 * fr->out2;
+    out_r_tmp >>= SHIFT_C;
+    fr->in2 = fr->in1;   fr->in1 = r;
+    fr->out2 = fr->out1; fr->out1 = out_r_tmp;
+    r = out_r_tmp;
+
+    fl++;
+    fr++;
   }
-  for(int i = 0; i < EQ_CH; i++) {
-    out = bc[i].b0 * in + bc[i].b1 * in1[i] + bc[i].b2 * in2[i] - bc[i].a1 * out1[i] - bc[i].a2 * out2[i];
-    out >>= SHIFT_C;
-    in2[i] = in1[i];    in1[i] = in;
-    out2[i] = out1[i];  out1[i] = out;
-    in = out;
-  }
-  return out / gainBC;
+  *out_l = (int32_t)(l / gainBC);
+  *out_r = (int32_t)(r / gainBC);
 }
 
 
@@ -834,8 +841,10 @@ static void _as_audio_packet(struct usb_endpoint *ep) {
   }
 
   for (int i = 0; i < audio_buffer->sample_count * 2; i+=2) {
-    out[i+1] = (filterL(in[i  ]) * vol2) >> 15u;
-    out[i  ] = (filterR(in[i+1]) * vol2) >> 15u;
+    int32_t out_l, out_r;
+    filterStereo(in[i], in[i+1], &out_l, &out_r);
+    out[i+1] = (out_l * vol2) >> 15u;
+    out[i  ] = (out_r * vol2) >> 15u;
   }
 
   give_audio_buffer(producer_pool, audio_buffer);
@@ -977,10 +986,17 @@ static void audio_set_volume(int16_t volume) {
   if(volume > MAX_VOLUME) { // comm. error
     return;
   }
-  audio_state.volume = volume;
   double vol = pow(10, volume / (256 * 20.0)); // 16q => dB => linear
   if(vol > 1.0) vol = 1.0;
-  audio_state.vol_mul = (int32_t)(vol * 0x7fff);
+  int32_t new_vol_mul = (int32_t)(vol * 0x7fff);
+
+  // 最小音量（vol_mul <= 3）の時は例外処理として音量を変えず、前の音量をキープする
+  if(new_vol_mul <= 3) {
+    return;
+  }
+
+  audio_state.volume = volume;
+  audio_state.vol_mul = new_vol_mul;
 }
 
 static void audio_cmd_packet(struct usb_endpoint *ep) {
@@ -996,14 +1012,15 @@ static void audio_cmd_packet(struct usb_endpoint *ep) {
 	break;
       }
       case FEATURE_VOLUME_CONTROL: {
-	audio_set_volume(*(int16_t *) buffer->data);
+	int16_t volume = (int16_t)(buffer->data[0] | (buffer->data[1] << 8));
+	audio_set_volume(volume);
 	break;
       }
       }
 
     } else if (audio_control_cmd_t.type == USB_REQ_TYPE_RECIPIENT_ENDPOINT) {
       if (audio_control_cmd_t.cs == ENDPOINT_FREQ_CONTROL) {
-	uint32_t new_freq = (*(uint32_t *) buffer->data) & 0x00ffffffu;
+	uint32_t new_freq = (buffer->data[0] | (buffer->data[1] << 8) | (buffer->data[2] << 16)) & 0x00ffffffu;
 	usb_warn("Set freq %d\n", new_freq == 0xffffffu ? -1 : (int) new_freq);
 
 	if (audio_state.freq != new_freq) {
